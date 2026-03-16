@@ -3,10 +3,7 @@
        name="iBroadcast Album Art"
        version="1.0.0"
        provider-name="FOBO">
-  <requires>
-    <import addon="xbmc.addon" version="0.0.0"/>
-  </requires>
-  <extension point="xbmc.player.musicviz"
+<extension point="xbmc.player.musicviz"
              library_osx="visualization.ibroadcast.albumart.dylib"
              library_linux="visualization.ibroadcast.albumart.so"
              library_android="visualization.ibroadcast.albumart.so"
