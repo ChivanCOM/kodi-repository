@@ -30,13 +30,10 @@ def build_zip(addon_dir):
     zip_name = f"{addon_dir}-{version}.zip"
     zip_path = os.path.join(ROOT, addon_dir, zip_name)
 
-    # Remove stale zips for this addon
+    # Remove all existing zips for this addon (always rebuild fresh)
     for f in os.listdir(os.path.join(ROOT, addon_dir)):
-        if f.endswith(".zip") and f != zip_name:
+        if f.endswith(".zip"):
             os.remove(os.path.join(ROOT, addon_dir, f))
-
-    if os.path.exists(zip_path):
-        return  # already up to date
 
     # Directories and file extensions to exclude from every zip
     SKIP_DIRS = {"build", "build_android", "src", "__pycache__", ".git"}
