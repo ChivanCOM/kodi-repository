@@ -71,9 +71,41 @@ def build_addons_xml():
     print(f"  addons.xml written ({len(ADDON_DIRS)} addons), md5={md5}")
 
 
+def build_index_html():
+    """Generate index.html files so Kodi's HTTP browser can navigate the repo."""
+    # Root index — lists addon subdirectories
+    root_links = "\n".join(
+        f'    <a href="{d}/">{d}/</a><br>' for d in sorted(ADDON_DIRS)
+    )
+    root_html = f"""<!DOCTYPE html>
+<html><body>
+<h1>iBroadcast Kodi Repository</h1>
+{root_links}
+</body></html>
+"""
+    with open(os.path.join(ROOT, "index.html"), "w") as f:
+        f.write(root_html)
+
+    # Per-addon index — lists the zip file
+    for addon_dir in ADDON_DIRS:
+        version = get_version(addon_dir)
+        zip_name = f"{addon_dir}-{version}.zip"
+        addon_html = f"""<!DOCTYPE html>
+<html><body>
+<h1>{addon_dir}</h1>
+    <a href="{zip_name}">{zip_name}</a><br>
+</body></html>
+"""
+        with open(os.path.join(ROOT, addon_dir, "index.html"), "w") as f:
+            f.write(addon_html)
+
+    print(f"  index.html files written")
+
+
 if __name__ == "__main__":
     print("Building Kodi repository...")
     for addon_dir in sorted(ADDON_DIRS):
         build_zip(addon_dir)
     build_addons_xml()
+    build_index_html()
     print("Done.")
