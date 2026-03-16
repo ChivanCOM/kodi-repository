@@ -278,7 +278,6 @@ def search_tracks():
 
 
 def play_track(track_id):
-    xbmc.Player().stop()
     api = get_api(require_library=True)
     if not api:
         xbmcplugin.setResolvedUrl(HANDLE, False, xbmcgui.ListItem())
