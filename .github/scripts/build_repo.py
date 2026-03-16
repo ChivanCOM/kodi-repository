@@ -38,12 +38,20 @@ def build_zip(addon_dir):
     if os.path.exists(zip_path):
         return  # already up to date
 
+    # Directories and file extensions to exclude from every zip
+    SKIP_DIRS = {"build", "src", "__pycache__", ".git"}
+    SKIP_EXTS = {".zip", ".cpp", ".h", ".sh"}
+    SKIP_FILES = {"CMakeLists.txt"}
+
     print(f"  Zipping {addon_dir} v{version}")
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         addon_path = os.path.join(ROOT, addon_dir)
-        for dirpath, _, filenames in os.walk(addon_path):
+        for dirpath, dirnames, filenames in os.walk(addon_path):
+            dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
             for filename in filenames:
-                if filename.endswith(".zip"):
+                if filename in SKIP_FILES:
+                    continue
+                if os.path.splitext(filename)[1] in SKIP_EXTS:
                     continue
                 full_path = os.path.join(dirpath, filename)
                 arcname = os.path.relpath(full_path, ROOT)
