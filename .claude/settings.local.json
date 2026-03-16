@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:devguide.ibroadcast.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:help.ibroadcast.com)",
+      "WebFetch(domain:devguide-dev.ibroadcast.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.ibroadcast.com)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ctrueden/ibroadcast-python/master/ibroadcast/ibroadcast.py\")",
+      "Bash(curl -s \"https://github.com/ctrueden/ibroadcast-python/blob/master/ibroadcast/ibroadcast.py\")",
+      "Bash(curl -s \"https://github.com/robsonke/ibroadcastaio/blob/main/ibroadcastaio/client.py\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/robsonke/ibroadcastaio/main/ibroadcastaio/client.py\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/ctrueden/ibroadcast-python/main/ibroadcast/ibroadcast.py\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/robsonke/ibroadcastaio/main/ibroadcastaio/__init__.py\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/codingnacho/ibroadcast-wrapper/master/src/ibroadcast.js\")",
+      "Bash(curl -s \"https://api.ibroadcast.com/\")",
+      "Bash(unzip -l \"/Users/chivan/Library/Mobile Documents/com~apple~CloudDocs/Projects/IBroadcast.Kodi/plugin.audio.ibroadcast-1.0.0.zip\")",
+      "Bash(curl -s -A Mozilla/5.0 https://help.ibroadcast.com/en/developer/components/streaming)",
+      "Bash(curl -s https://raw.githubusercontent.com/Codrax/iBroadcast-For-Windows/main/BroadcastAPI.pas)"
+    ]
+  }
+}

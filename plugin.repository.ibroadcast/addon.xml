@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.repository.ibroadcast"
+       name="iBroadcast Repository"
+       version="1.0.0"
+       provider-name="FOBO">
+  <requires>
+    <import addon="xbmc.addon" version="0.0.0"/>
+  </requires>
+  <extension point="xbmc.addon.repository" name="iBroadcast Repository">
+    <info compressed="false">https://ChivanCOM.github.io/kodi-ibroadcast/addons.xml</info>
+    <checksum>https://ChivanCOM.github.io/kodi-ibroadcast/addons.xml.md5</checksum>
+    <datadir zip="true">https://ChivanCOM.github.io/kodi-ibroadcast/</datadir>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <assets>
+      <icon>icon.png</icon>
+    </assets>
+    <summary lang="en_GB">iBroadcast Repository</summary>
+    <description lang="en_GB">Repository for iBroadcast Kodi addons.</description>
+    <platform>all</platform>
+  </extension>
+</addon>

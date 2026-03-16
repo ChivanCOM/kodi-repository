@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<settings version="1">
+  <section id="plugin.audio.ibroadcast">
+    <category id="account" label="32000" help="">
+      <group id="1">
+        <!-- credentials stored by the plugin; never shown to the user -->
+        <setting id="token" type="string" label="" help="">
+          <level>9</level>
+          <default/>
+          <control type="edit" format="string"/>
+          <visible>false</visible>
+        </setting>
+        <setting id="user_id" type="string" label="" help="">
+          <level>9</level>
+          <default/>
+          <control type="edit" format="string"/>
+          <visible>false</visible>
+        </setting>
+        <setting id="account" type="action" label="32001" help="">
+          <level>0</level>
+          <data>RunPlugin(plugin://plugin.audio.ibroadcast/?mode=account)</data>
+          <control type="button" format="action">
+            <close>true</close>
+          </control>
+        </setting>
+      </group>
+    </category>
+    <category id="playback" label="32010" help="">
+      <group id="2">
+        <setting id="bitrate" type="string" label="32011" help="">
+          <default>128</default>
+          <constraints>
+            <options>
+              <option label="32020">96</option>
+              <option label="32021">128</option>
+              <option label="32022">192</option>
+              <option label="32023">256</option>
+              <option label="32024">320</option>
+            </options>
+          </constraints>
+          <control type="list" format="string"/>
+        </setting>
+      </group>
+    </category>
+  </section>
+</settings>

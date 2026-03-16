@@ -1,0 +1,45 @@
+# Kodi Media Center language file
+# Addon Name: iBroadcast Music
+# Addon id: plugin.audio.ibroadcast
+# Addon Provider: FOBO
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: en_GB\n"
+
+msgctxt "#32000"
+msgid "Account"
+msgstr ""
+
+msgctxt "#32001"
+msgid "Login / Logout"
+msgstr ""
+
+msgctxt "#32010"
+msgid "Playback"
+msgstr ""
+
+msgctxt "#32011"
+msgid "Stream Bitrate"
+msgstr ""
+
+msgctxt "#32020"
+msgid "96 kbps"
+msgstr ""
+
+msgctxt "#32021"
+msgid "128 kbps"
+msgstr ""
+
+msgctxt "#32022"
+msgid "192 kbps"
+msgstr ""
+
+msgctxt "#32023"
+msgid "256 kbps"
+msgstr ""
+
+msgctxt "#32024"
+msgid "320 kbps"
+msgstr ""
