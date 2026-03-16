@@ -45,7 +45,6 @@ endif()
 # ── Install into addon folder ─────────────────────────────────────────────────
 install(TARGETS ${PROJECT_NAME}
   LIBRARY DESTINATION "${CMAKE_SOURCE_DIR}/.."
-  MODULE  DESTINATION "${CMAKE_SOURCE_DIR}/.."
 )
 install(FILES "${CMAKE_SOURCE_DIR}/../addon.xml"
               "${CMAKE_SOURCE_DIR}/../icon.png"
