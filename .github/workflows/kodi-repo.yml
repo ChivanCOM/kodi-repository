@@ -40,3 +40,37 @@ jobs:
           git add -A
           git diff --cached --quiet || git commit -m "chore: update repository [skip ci]"
           git push
+
+      - name: Deploy repository installer to kodi-repository-install
+        env:
+          INSTALL_REPO_TOKEN: ${{ secrets.INSTALL_REPO_TOKEN }}
+        run: |
+          [ -z "$INSTALL_REPO_TOKEN" ] && echo "INSTALL_REPO_TOKEN not set, skipping." && exit 0
+          ZIP=$(ls zips/plugin.repository.ibroadcast/*.zip 2>/dev/null | head -1)
+          [ -z "$ZIP" ] && echo "No installer zip found, skipping." && exit 0
+          ZIP_NAME=$(basename "$ZIP")
+
+          git clone "https://x-access-token:${INSTALL_REPO_TOKEN}@github.com/ChivanCOM/kodi-repository-install.git" /tmp/kodi-repo-install
+
+          cp "$ZIP" /tmp/kodi-repo-install/
+          cp zips/plugin.repository.ibroadcast/icon.png /tmp/kodi-repo-install/ 2>/dev/null || true
+
+          cat > /tmp/kodi-repo-install/index.html <<EOF
+          <!DOCTYPE html>
+          <html>
+          <head><title>iBroadcast Kodi Repository</title></head>
+          <body>
+          <h1>iBroadcast Kodi Repository Installer</h1>
+          <p>Download and install this zip in Kodi via <b>Add-ons → Install from zip file</b>:</p>
+          <p><a href="${ZIP_NAME}">${ZIP_NAME}</a></p>
+          <p>Once installed, the iBroadcast plugin and visualizer are available via the repository.</p>
+          </body>
+          </html>
+          EOF
+
+          cd /tmp/kodi-repo-install
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: update repository installer [skip ci]"
+          git push
