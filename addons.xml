@@ -33,7 +33,7 @@
       <platform>all</platform>
     </extension>
   </addon>
-  <addon id="plugin.visualization.albumart" name="iBroadcast Album Art" version="1.0.1+osx" provider-name="ChivanCOM">
+  <addon id="plugin.visualization.albumart" name="ChivanCOM Album Art" version="1.0.2+osx" provider-name="ChivanCOM">
     <requires>
       <import addon="kodi.binary.global.main" version="2.0.0" />
       <import addon="kodi.binary.instance.visualization" version="4.0.0" />
@@ -43,12 +43,12 @@
       <assets>
         <icon>icon.png</icon>
       </assets>
-      <summary lang="en_GB">Album Art Visualizer</summary>
+      <summary lang="en_GB">ChivanCOM Album Art Visualizer</summary>
       <description lang="en_GB">Displays the current track album art full-screen during playback.</description>
       <platform>osx</platform>
     </extension>
   </addon>
-  <addon id="plugin.visualization.albumart" name="iBroadcast Album Art" version="1.0.1+android" provider-name="ChivanCOM">
+  <addon id="plugin.visualization.albumart" name="ChivanCOM Album Art" version="1.0.2+android" provider-name="ChivanCOM">
     <requires>
       <import addon="kodi.binary.global.main" version="2.0.0" />
       <import addon="kodi.binary.instance.visualization" version="4.0.0" />
@@ -58,7 +58,7 @@
       <assets>
         <icon>icon.png</icon>
       </assets>
-      <summary lang="en_GB">Album Art Visualizer</summary>
+      <summary lang="en_GB">ChivanCOM Album Art Visualizer</summary>
       <description lang="en_GB">Displays the current track album art full-screen during playback.</description>
       <platform>android</platform>
     </extension>
