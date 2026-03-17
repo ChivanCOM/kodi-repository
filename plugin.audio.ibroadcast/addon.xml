@@ -2,7 +2,7 @@
 <addon id="plugin.audio.ibroadcast"
        name="iBroadcast Music"
        version="1.2.3"
-       provider-name="FOBO">
+       provider-name="ChivanCOM">
   <requires>
     <import addon="xbmc.python" version="3.0.0"/>
   </requires>
