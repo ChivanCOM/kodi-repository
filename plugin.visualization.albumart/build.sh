@@ -35,7 +35,18 @@ else
   echo "→ stb_image.h already present ✓"
 fi
 
-# ── 3. Fetch Kodi dev-kit headers (shallow, headers only) ────────────────────
+# ── 3. Download stb_truetype.h ────────────────────────────────────────────────
+STB_TRUETYPE="${SCRIPT_DIR}/src/stb_truetype.h"
+if [[ ! -f "$STB_TRUETYPE" ]]; then
+  echo "→ Downloading stb_truetype.h..."
+  curl -sL "https://raw.githubusercontent.com/nothings/stb/master/stb_truetype.h" \
+       -o "$STB_TRUETYPE"
+  echo "  stb_truetype.h ✓"
+else
+  echo "→ stb_truetype.h already present ✓"
+fi
+
+# ── 4. Fetch Kodi dev-kit headers (shallow, headers only) ────────────────────
 if [[ ! -d "$KODI_INCLUDE" ]]; then
   echo "→ Fetching Kodi Omega headers (shallow clone, this may take a minute)..."
   git clone --depth=1 --filter=blob:none --sparse \

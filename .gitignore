@@ -3,5 +3,6 @@
 plugin.visualization.albumart/build/
 plugin.visualization.albumart/build_android/
 plugin.visualization.albumart/src/stb_image.h
+plugin.visualization.albumart/src/stb_truetype.h
 plugin.visualization.albumart/*.dylib
 plugin.visualization.albumart/*.so
