@@ -122,11 +122,11 @@ public:
     return true;
   }
 
-  bool UpdateTrack(const kodi::addon::VisTrack& track) override
+  bool UpdateTrack(const kodi::addon::VisualizationTrack& track) override
   {
-    m_title  = track.title;
-    m_artist = track.artist;
-    m_album  = track.album;
+    m_title  = track.GetTitle();
+    m_artist = track.GetArtist();
+    m_album  = track.GetAlbum();
     m_pendingText = true;
     return true;
   }
