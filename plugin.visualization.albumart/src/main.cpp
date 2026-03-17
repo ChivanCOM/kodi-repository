@@ -67,14 +67,15 @@ static const char* FRAG_SRC =
 
 struct TextTex
 {
-  GLuint id = 0;
-  float  w  = 0.f;
-  float  h  = 0.f;
+  GLuint id   = 0;
+  float  w    = 0.f;
+  float  h    = 0.f;
+  float  xOff = 0.f;  // left padding pixels (italic shear); subtract from X to align baselines
 
   void destroy()
   {
     if (id) { glDeleteTextures(1, &id); id = 0; }
-    w = h = 0.f;
+    w = h = xOff = 0.f;
   }
 };
 
@@ -508,8 +509,9 @@ private:
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
 
-    out.w = (float)imgW;
-    out.h = (float)imgH;
+    out.w    = (float)imgW;
+    out.h    = (float)imgH;
+    out.xOff = (float)extraL;  // pixels of left padding to skip for baseline alignment
     return out;
   }
 
@@ -565,12 +567,14 @@ private:
     m_texAlbum  = MakeTextTex(m_album.empty()  ? " " : m_album,  szAlbum,  false);
 
     // Scale ndcPerPx down if any line overflows panel width
+    // Use (w - xOff) as effective visible width from textX0 to right edge
     m_ndcPerPx = 2.f / (float)vw;
     auto fitW = [&](const TextTex& t) {
-      if (t.w <= 0.f) return;
-      float needed = t.w * m_ndcPerPx;
+      float effW = t.w - t.xOff;
+      if (effW <= 0.f) return;
+      float needed = effW * m_ndcPerPx;
       if (needed > textWNdc)
-        m_ndcPerPx = textWNdc / t.w;
+        m_ndcPerPx = textWNdc / effW;
     };
     fitW(m_texTitle);
     fitW(m_texArtist);
@@ -581,9 +585,9 @@ private:
     float hArtist = m_texArtist.h * m_ndcPerPxH;
     float hAlbum  = m_texAlbum.h  * m_ndcPerPxH;
 
-    // Golden-ratio gaps between lines
+    // Golden-ratio gaps between lines; album gap halved to bring it closer
     float gap1   = hArtist * (kPhi - 1.f);
-    float gap2   = hAlbum  * (kPhi - 1.f);
+    float gap2   = hAlbum  * (kPhi - 1.f) * 0.5f;
     float blockH = hTitle + gap1 + hArtist + gap2 + hAlbum;
 
     // Centre text block within art height
@@ -594,7 +598,10 @@ private:
     m_artistY = m_titleY - gap1 - hArtist;
     m_albumY  = m_artistY - gap2 - hAlbum;
 
-    m_titleX = m_artistX = m_albumX = textX0;
+    // Shift each texture left by its xOff so all baselines start at textX0
+    m_titleX  = textX0 - m_texTitle.xOff  * m_ndcPerPx;
+    m_artistX = textX0 - m_texArtist.xOff * m_ndcPerPx;
+    m_albumX  = textX0 - m_texAlbum.xOff  * m_ndcPerPx;
   }
 
   // ── State ──────────────────────────────────────────────────────────────────
