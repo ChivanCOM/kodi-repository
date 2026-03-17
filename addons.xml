@@ -18,9 +18,9 @@
   </addon>
   <addon id="plugin.repository.ibroadcast" name="iBroadcast Repository" version="1.0.1" provider-name="FOBO">
     <extension point="xbmc.addon.repository" name="iBroadcast Repository">
-      <info compressed="false">https://ChivanCOM.github.io/kodi-ibroadcast/addons.xml</info>
-      <checksum>https://ChivanCOM.github.io/kodi-ibroadcast/addons.xml.md5</checksum>
-      <datadir zip="true">https://ChivanCOM.github.io/kodi-ibroadcast/zips/</datadir>
+      <info compressed="false">https://ChivanCOM.github.io/kodi-repository/addons.xml</info>
+      <checksum>https://ChivanCOM.github.io/kodi-repository/addons.xml.md5</checksum>
+      <datadir zip="true">https://ChivanCOM.github.io/kodi-repository/zips/</datadir>
     </extension>
     <extension point="xbmc.addon.metadata">
       <assets>
