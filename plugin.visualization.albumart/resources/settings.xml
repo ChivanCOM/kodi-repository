@@ -19,7 +19,11 @@
           </constraints>
           <control type="list" format="string"/>
         </setting>
-        <setting id="blur_enabled" type="bool" label="32010" default="true"/>
+        <setting id="blur_enabled" type="boolean" label="32010" help="">
+          <level>0</level>
+          <default>true</default>
+          <control type="toggle"/>
+        </setting>
       </group>
     </category>
   </section>
