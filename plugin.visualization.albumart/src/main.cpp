@@ -615,7 +615,9 @@ public:
 
   ADDON_STATUS Create() override
   {
-    kodi::addon::CheckSettingInt("shader", m_shaderIdx);
+    std::string shaderStr = "1";
+    kodi::addon::CheckSettingString("shader", shaderStr);
+    m_shaderIdx = std::stoi(shaderStr);
     kodi::addon::CheckSettingBoolean("blur_enabled", m_blurEnabled);
     return ADDON_STATUS_OK;
   }
@@ -623,7 +625,7 @@ public:
   ADDON_STATUS SetSetting(const std::string& settingName,
                           const kodi::addon::CSettingValue& settingValue) override
   {
-    if (settingName == "shader")       m_shaderIdx   = settingValue.GetInt();
+    if (settingName == "shader")       m_shaderIdx   = std::stoi(settingValue.GetString());
     if (settingName == "blur_enabled") m_blurEnabled = settingValue.GetBoolean();
     return ADDON_STATUS_OK;
   }
