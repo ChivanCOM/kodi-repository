@@ -81,13 +81,13 @@ static const char* BLUR_FRAG_SRC =
   "uniform   sampler2D u_tex;\n"
   "uniform   vec2      u_dir;\n"
   "void main() {\n"
-  "  vec2 d = u_dir * 1.5;\n"
+  "  vec2 d = u_dir * 4.0;\n"
   "  vec4 c = texture2D(u_tex, v_uv - d*2.0) * 0.0625\n"
   "         + texture2D(u_tex, v_uv - d     ) * 0.25\n"
   "         + texture2D(u_tex, v_uv         ) * 0.375\n"
   "         + texture2D(u_tex, v_uv + d     ) * 0.25\n"
   "         + texture2D(u_tex, v_uv + d*2.0 ) * 0.0625;\n"
-  "  gl_FragColor = c;\n"
+  "  gl_FragColor = c * 0.65;\n"
   "}\n";
 #else
   "#version 150\n"
@@ -96,13 +96,13 @@ static const char* BLUR_FRAG_SRC =
   "uniform sampler2D u_tex;\n"
   "uniform vec2      u_dir;\n"
   "void main() {\n"
-  "  vec2 d = u_dir * 1.5;\n"
+  "  vec2 d = u_dir * 4.0;\n"
   "  vec4 c = texture(u_tex, v_uv - d*2.0) * 0.0625\n"
   "         + texture(u_tex, v_uv - d     ) * 0.25\n"
   "         + texture(u_tex, v_uv         ) * 0.375\n"
   "         + texture(u_tex, v_uv + d     ) * 0.25\n"
   "         + texture(u_tex, v_uv + d*2.0 ) * 0.0625;\n"
-  "  fragColor = c;\n"
+  "  fragColor = c * 0.65;\n"
   "}\n";
 #endif
 
