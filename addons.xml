@@ -33,7 +33,7 @@
       <platform>all</platform>
     </extension>
   </addon>
-  <addon id="plugin.visualization.albumart" name="ChivanCOM Album Art" version="1.2.1+osx" provider-name="ChivanCOM">
+  <addon id="plugin.visualization.albumart" name="ChivanCOM Album Art" version="1.2.2+osx" provider-name="ChivanCOM">
     <requires>
       <import addon="kodi.binary.global.main" version="2.0.0" />
       <import addon="kodi.binary.instance.visualization" version="4.0.0" />
@@ -48,7 +48,7 @@
       <platform>osx</platform>
     </extension>
   </addon>
-  <addon id="plugin.visualization.albumart" name="ChivanCOM Album Art" version="1.2.1+android" provider-name="ChivanCOM">
+  <addon id="plugin.visualization.albumart" name="ChivanCOM Album Art" version="1.2.2+android" provider-name="ChivanCOM">
     <requires>
       <import addon="kodi.binary.global.main" version="2.0.0" />
       <import addon="kodi.binary.instance.visualization" version="4.0.0" />
