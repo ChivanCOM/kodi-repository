@@ -29,6 +29,14 @@ msgctxt "#32005"
 msgid "Tunnelwisp"
 msgstr ""
 
+msgctxt "#32006"
+msgid "None"
+msgstr ""
+
+msgctxt "#32007"
+msgid "Plasma"
+msgstr ""
+
 msgctxt "#32010"
 msgid "Enable Background Blur"
 msgstr ""

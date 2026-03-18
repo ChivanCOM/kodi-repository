@@ -87,7 +87,8 @@ static const char* BLUR_FRAG_SRC =
   "         + texture2D(u_tex, v_uv         ) * 0.375\n"
   "         + texture2D(u_tex, v_uv + d     ) * 0.25\n"
   "         + texture2D(u_tex, v_uv + d*2.0 ) * 0.0625;\n"
-  "  gl_FragColor = c * 0.65;\n"
+  "  float n = fract(sin(v_uv.x*127.1+v_uv.y*311.7)*43758.5453) * (1.0/255.0);\n"
+  "  gl_FragColor = c * 0.65 + n;\n"
   "}\n";
 #else
   "#version 150\n"
@@ -102,7 +103,8 @@ static const char* BLUR_FRAG_SRC =
   "         + texture(u_tex, v_uv         ) * 0.375\n"
   "         + texture(u_tex, v_uv + d     ) * 0.25\n"
   "         + texture(u_tex, v_uv + d*2.0 ) * 0.0625;\n"
-  "  fragColor = c * 0.65;\n"
+  "  float n = fract(sin(v_uv.x*127.1+v_uv.y*311.7)*43758.5453) * (1.0/255.0);\n"
+  "  fragColor = c * 0.65 + n;\n"
   "}\n";
 #endif
 
@@ -219,7 +221,7 @@ static const char* BG1_FRAG_SRC =
   "float sdSphere(vec3 p,float s){return length(p)-s;}\n"
   "float mapScene(vec3 p){\n"
   "  float d=2.0;\n"
-  "  for(int i=0;i<16;i++){\n"
+  "  for(int i=0;i<8;i++){\n"
   "    float fi=float(i);\n"
   "    float t=iTime*(fract(fi*412.531+0.513)-0.5)*2.0;\n"
   "    d=opSmoothUnion(\n"
@@ -240,7 +242,7 @@ static const char* BG1_FRAG_SRC =
   "  vec3 rd=vec3(0.0,0.0,-1.0);\n"
   "  float depth=0.0;\n"
   "  vec3 p=ro;\n"
-  "  for(int i=0;i<64;i++){\n"
+  "  for(int i=0;i<32;i++){\n"
   "    p=ro+rd*depth;\n"
   "    float dist=mapScene(p);\n"
   "    depth+=dist;\n"
@@ -266,7 +268,7 @@ static const char* BG1_FRAG_SRC =
   "float sdSphere(vec3 p,float s){return length(p)-s;}\n"
   "float mapScene(vec3 p){\n"
   "  float d=2.0;\n"
-  "  for(int i=0;i<16;i++){\n"
+  "  for(int i=0;i<8;i++){\n"
   "    float fi=float(i);\n"
   "    float t=iTime*(fract(fi*412.531+0.513)-0.5)*2.0;\n"
   "    d=opSmoothUnion(\n"
@@ -287,7 +289,7 @@ static const char* BG1_FRAG_SRC =
   "  vec3 rd=vec3(0.0,0.0,-1.0);\n"
   "  float depth=0.0;\n"
   "  vec3 p=ro;\n"
-  "  for(int i=0;i<64;i++){\n"
+  "  for(int i=0;i<32;i++){\n"
   "    p=ro+rd*depth;\n"
   "    float dist=mapScene(p);\n"
   "    depth+=dist;\n"
@@ -481,78 +483,123 @@ static const char* BG3_FRAG_SRC =
   "}\n";
 #endif
 
-// ── BG shader 4: Trailing the Twinkling Tunnelwisp (CC0) ─────────────────────
-// Gyroid cave raymarch + tanh tone mapping. No audio dependency.
+// ── BG shader 4: Tunnelwisp Lite ─────────────────────────────────────────────
+// Lightweight fake tunnel using polar coords + 2D sin/cos pattern.
+// No loops, no raymarching — runs on low-end devices.
 
 static const char* BG4_FRAG_SRC =
 #if defined(HAS_GLES)
   "precision mediump float;\n"
   "uniform vec2  iResolution;\n"
   "uniform float iTime;\n"
-  "\n"
-  "float g(vec4 p,float s){\n"
-  "  p*=s;\n"
-  "  return abs(dot(sin(p),cos(p.zxwy))-1.0)/s;\n"
-  "}\n"
-  "vec4 tanh4(vec4 x){\n"
-  "  vec4 e=exp(2.0*x);\n"
-  "  return (e-1.0)/(e+1.0);\n"
-  "}\n"
   "void main(){\n"
-  "  vec2 C=gl_FragCoord.xy,r=iResolution.xy;\n"
-  "  float d=0.0,z=0.0,s=0.0,T=iTime;\n"
-  "  vec4 o=vec4(0.0),q=vec4(0.0),p=vec4(0.0),pc,m;\n"
-  "  vec4 U=vec4(2.0,1.0,0.0,3.0);\n"
-  "  for(int n=0;n<78;n++){\n"
-  "    z+=d+5e-4;\n"
-  "    q=vec4(normalize(vec3(C-0.5*r,r.y))*z,0.2);\n"
-  "    q.z+=T/30.0; s=q.y+0.1; q.y=abs(s);\n"
-  "    p=q; p.y-=0.11;\n"
-  "    m=cos(11.0*U.zywz-2.0*p.z);\n"
-  "    p.xy*=mat2(m.x,m.y,m.z,m.w); p.y-=0.2;\n"
-  "    d=abs(g(p,8.0)-g(p,24.0))/4.0;\n"
-  "    pc=1.0+cos(0.7*U+5.0*q.z);\n"
-  "    o+=(s>0.0?1.0:0.1)*pc.w*pc/max(s>0.0?d:d*d*d,5e-4);\n"
-  "  }\n"
-  "  o+=(1.4+sin(T)*sin(1.7*T)*sin(2.3*T))*1e3*U/length(q.xy);\n"
-  "  gl_FragColor=tanh4(o/1e5);\n"
+  "  vec2 uv=(gl_FragCoord.xy*2.0-iResolution.xy)/iResolution.y;\n"
+  "  float r=length(uv)+1e-4;\n"
+  "  float a=atan(uv.y,uv.x);\n"
+  "  float T=iTime*0.4;\n"
+  "  float tx=a/3.14159265;\n"
+  "  float ty=1.0/r+T;\n"
+  "  tx+=sin(ty*1.5+T*0.5)*0.25;\n"
+  "  float p=sin(tx*9.42)*cos(ty*6.28)\n"
+  "         +cos(tx*6.28+T)*sin(ty*9.42+T*0.7);\n"
+  "  p=p*0.5+0.5;\n"
+  "  vec3 col=0.5+0.5*cos(vec3(p*4.0,p*4.0+2.094,p*4.0+4.189)+T*0.3);\n"
+  "  float glow=0.15/(r+0.05);\n"
+  "  col=col*min(glow,1.5)*(0.6+0.4*p);\n"
+  "  col=col/(col+1.0);\n"
+  "  gl_FragColor=vec4(col,1.0);\n"
   "}\n";
 #else
   "#version 150\n"
   "uniform vec2  iResolution;\n"
   "uniform float iTime;\n"
   "out vec4 fragColor;\n"
-  "\n"
-  "float g(vec4 p,float s){\n"
-  "  p*=s;\n"
-  "  return abs(dot(sin(p),cos(p.zxwy))-1.0)/s;\n"
-  "}\n"
   "void main(){\n"
-  "  vec2 C=gl_FragCoord.xy,r=iResolution.xy;\n"
-  "  float d=0.0,z=0.0,s=0.0,T=iTime;\n"
-  "  vec4 o=vec4(0.0),q=vec4(0.0),p=vec4(0.0),pc,m;\n"
-  "  vec4 U=vec4(2.0,1.0,0.0,3.0);\n"
-  "  for(int n=0;n<78;n++){\n"
-  "    z+=d+5e-4;\n"
-  "    q=vec4(normalize(vec3(C-0.5*r,r.y))*z,0.2);\n"
-  "    q.z+=T/30.0; s=q.y+0.1; q.y=abs(s);\n"
-  "    p=q; p.y-=0.11;\n"
-  "    m=cos(11.0*U.zywz-2.0*p.z);\n"
-  "    p.xy*=mat2(m.x,m.y,m.z,m.w); p.y-=0.2;\n"
-  "    d=abs(g(p,8.0)-g(p,24.0))/4.0;\n"
-  "    pc=1.0+cos(0.7*U+5.0*q.z);\n"
-  "    o+=(s>0.0?1.0:0.1)*pc.w*pc/max(s>0.0?d:d*d*d,5e-4);\n"
-  "  }\n"
-  "  o+=(1.4+sin(T)*sin(1.7*T)*sin(2.3*T))*1e3*U/length(q.xy);\n"
-  "  fragColor=tanh(o/1e5);\n"
+  "  vec2 uv=(gl_FragCoord.xy*2.0-iResolution.xy)/iResolution.y;\n"
+  "  float r=length(uv)+1e-4;\n"
+  "  float a=atan(uv.y,uv.x);\n"
+  "  float T=iTime*0.4;\n"
+  "  float tx=a/3.14159265;\n"
+  "  float ty=1.0/r+T;\n"
+  "  tx+=sin(ty*1.5+T*0.5)*0.25;\n"
+  "  float p=sin(tx*9.42)*cos(ty*6.28)\n"
+  "         +cos(tx*6.28+T)*sin(ty*9.42+T*0.7);\n"
+  "  p=p*0.5+0.5;\n"
+  "  vec3 col=0.5+0.5*cos(vec3(p*4.0,p*4.0+2.094,p*4.0+4.189)+T*0.3);\n"
+  "  float glow=0.15/(r+0.05);\n"
+  "  col=col*min(glow,1.5)*(0.6+0.4*p);\n"
+  "  col=col/(col+1.0);\n"
+  "  fragColor=vec4(col,1.0);\n"
+  "}\n";
+#endif
+
+// ── BG shader 6: Plasma (audio-reactive Lissajous / colour plasma) ───────────
+// iChannel0 = audio texture (freq row y=0). iMouse omitted (no cursor in Kodi).
+
+static const char* BG6_FRAG_SRC =
+#if defined(HAS_GLES)
+  "precision mediump float;\n"
+  "uniform vec2      iResolution;\n"
+  "uniform float     iTime;\n"
+  "uniform sampler2D iChannel0;\n"
+  "#define pi 3.14159\n"
+  "const vec2 vp=vec2(320.0,200.0);\n"
+  "void main(){\n"
+  "  float Freq=texture2D(iChannel0,vec2(0.0,0.0)).r;\n"
+  "  float t=iTime*10.0+Freq*80.0;\n"
+  "  vec2 uv=(gl_FragCoord.xy-iResolution.xy*0.5)/iResolution.xy*(0.7+Freq*0.3);\n"
+  "  float R=cos(Freq*5.0)*0.2;\n"
+  "  uv*=mat2(cos(R),-sin(R),sin(R),cos(R));\n"
+  "  uv+=iTime*0.3;\n"
+  "  vec2 p0=(uv-0.5)*vp;\n"
+  "  vec2 hvp=vp*0.5;\n"
+  "  vec2 p1d=vec2(cos(t/98.0),sin(t/178.0))*hvp-p0;\n"
+  "  vec2 p2d=vec2(sin(-t/124.0),cos(-t/104.0))*hvp-p0;\n"
+  "  vec2 p3d=vec2(cos(-t/165.0),cos(t/45.0))*hvp-p0;\n"
+  "  float sum=0.5+0.5*(cos(length(p1d)/40.0)+cos(length(p2d)/30.0)\n"
+  "    +sin(length(p3d)/35.0)*sin(p3d.x/20.0)*sin(p3d.y/15.0));\n"
+  "  vec3 Color=vec3(\n"
+  "    cos(Freq+uv.x*3.0+iTime+pi*0.333333)*0.5+0.5,\n"
+  "    cos(Freq+uv.y*3.0+iTime+pi*0.666666)*0.5+0.5,\n"
+  "    -cos(Freq+length(uv)*3.0+iTime)*0.5+0.5);\n"
+  "  gl_FragColor=vec4(Color*texture2D(iChannel0,vec2(fract(sum+iTime),0.0)).r,1.0);\n"
+  "}\n";
+#else
+  "#version 150\n"
+  "uniform vec2      iResolution;\n"
+  "uniform float     iTime;\n"
+  "uniform sampler2D iChannel0;\n"
+  "out vec4 fragColor;\n"
+  "#define pi 3.14159\n"
+  "const vec2 vp=vec2(320.0,200.0);\n"
+  "void main(){\n"
+  "  float Freq=texture(iChannel0,vec2(0.0,0.0)).r;\n"
+  "  float t=iTime*10.0+Freq*80.0;\n"
+  "  vec2 uv=(gl_FragCoord.xy-iResolution.xy*0.5)/iResolution.xy*(0.7+Freq*0.3);\n"
+  "  float R=cos(Freq*5.0)*0.2;\n"
+  "  uv*=mat2(cos(R),-sin(R),sin(R),cos(R));\n"
+  "  uv+=iTime*0.3;\n"
+  "  vec2 p0=(uv-0.5)*vp;\n"
+  "  vec2 hvp=vp*0.5;\n"
+  "  vec2 p1d=vec2(cos(t/98.0),sin(t/178.0))*hvp-p0;\n"
+  "  vec2 p2d=vec2(sin(-t/124.0),cos(-t/104.0))*hvp-p0;\n"
+  "  vec2 p3d=vec2(cos(-t/165.0),cos(t/45.0))*hvp-p0;\n"
+  "  float sum=0.5+0.5*(cos(length(p1d)/40.0)+cos(length(p2d)/30.0)\n"
+  "    +sin(length(p3d)/35.0)*sin(p3d.x/20.0)*sin(p3d.y/15.0));\n"
+  "  vec3 Color=vec3(\n"
+  "    cos(Freq+uv.x*3.0+iTime+pi*0.333333)*0.5+0.5,\n"
+  "    cos(Freq+uv.y*3.0+iTime+pi*0.666666)*0.5+0.5,\n"
+  "    -cos(Freq+length(uv)*3.0+iTime)*0.5+0.5);\n"
+  "  fragColor=vec4(Color*texture(iChannel0,vec2(fract(sum+iTime),0.0)).r,1.0);\n"
   "}\n";
 #endif
 
 // ── FFT (Cooley-Tukey radix-2) ────────────────────────────────────────────────
 
-static void ComputeFFTMagnitudes(const float* mono, int n, float* out)
+static void ComputeFFTMagnitudes(const float* mono, int n, float* out,
+                                  std::vector<std::complex<float>>& a)
 {
-  std::vector<std::complex<float>> a(n);
+  a.resize(n);
   for (int i = 0; i < n; i++)
   {
     float w = 0.5f * (1.f - cosf(2.f * (float)M_PI * i / (n - 1)));
@@ -655,7 +702,7 @@ public:
     for (int i = 0; i < kAudioW; i++)
       m_waveData[i] = mono[i] * 0.5f + 0.5f;
 
-    ComputeFFTMagnitudes(mono, kAudioW, m_freqData);
+    ComputeFFTMagnitudes(mono, kAudioW, m_freqData, m_fftBuf);
     float peak = 0.f;
     for (int i = 1; i < kAudioW / 2; i++) peak = std::max(peak, m_freqData[i]);
     if (peak > 0.f)
@@ -695,8 +742,10 @@ public:
     }
     if (m_audioTexDirty) { m_audioTexDirty = false; UploadAudioTex(); }
 
-    float elapsed = std::chrono::duration<float>(
-        std::chrono::steady_clock::now() - m_startTime).count();
+    float elapsed = std::fmod(
+        std::chrono::duration<float>(
+            std::chrono::steady_clock::now() - m_startTime).count(),
+        3600.0f);   // wrap at 1 h — keeps sin/cos args small on old GPU
 
     // Save Kodi's framebuffer and viewport so we can restore them
     GLint prevFBO = 0;
@@ -737,6 +786,20 @@ public:
       glUseProgram(m_bgProgram4);
       glUniform2f(m_locResolution4, (float)m_fboW, (float)m_fboH);
       glUniform1f(m_locTime4, elapsed);
+    }
+    else if (m_shaderIdx == 5)
+    {
+      glClearColor(0.f, 0.f, 0.f, 1.f);
+      glClear(GL_COLOR_BUFFER_BIT);
+    }
+    else if (m_shaderIdx == 6)
+    {
+      glUseProgram(m_bgProgram6);
+      glUniform2f(m_locResolution6, (float)m_fboW, (float)m_fboH);
+      glUniform1f(m_locTime6, elapsed);
+      glActiveTexture(GL_TEXTURE0);
+      glBindTexture(GL_TEXTURE_2D, m_audioTex);
+      glUniform1i(m_locAudio6, 0);
     }
     else
     {
@@ -881,6 +944,12 @@ private:
     m_locResolution4 = glGetUniformLocation(m_bgProgram4, "iResolution");
     m_locTime4       = glGetUniformLocation(m_bgProgram4, "iTime");
 
+    m_bgProgram6 = LinkProgram(VERT_SRC, BG6_FRAG_SRC);
+    if (!m_bgProgram6) return false;
+    m_locResolution6 = glGetUniformLocation(m_bgProgram6, "iResolution");
+    m_locTime6       = glGetUniformLocation(m_bgProgram6, "iTime");
+    m_locAudio6      = glGetUniformLocation(m_bgProgram6, "iChannel0");
+
     glGenBuffers(1, &m_vbo);
 #if !defined(HAS_GLES)
     glGenVertexArrays(1, &m_vao);
@@ -960,17 +1029,16 @@ private:
 
   void UploadAudioTex()
   {
-    std::vector<uint8_t> pixels(kAudioW * 2 * 4);
     for (int i = 0; i < kAudioW; i++)
     {
       uint8_t fv = (uint8_t)(std::min(1.f, m_freqData[i]) * 255.f);
       uint8_t wv = (uint8_t)(std::max(0.f, std::min(1.f, m_waveData[i])) * 255.f);
       int f4 = i * 4, w4 = (kAudioW + i) * 4;
-      pixels[f4]=pixels[f4+1]=pixels[f4+2]=fv; pixels[f4+3]=255;
-      pixels[w4]=pixels[w4+1]=pixels[w4+2]=wv; pixels[w4+3]=255;
+      m_audioPixels[f4]=m_audioPixels[f4+1]=m_audioPixels[f4+2]=fv; m_audioPixels[f4+3]=255;
+      m_audioPixels[w4]=m_audioPixels[w4+1]=m_audioPixels[w4+2]=wv; m_audioPixels[w4+3]=255;
     }
     glBindTexture(GL_TEXTURE_2D, m_audioTex);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kAudioW, 2, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, kAudioW, 2, GL_RGBA, GL_UNSIGNED_BYTE, m_audioPixels.data());
     glBindTexture(GL_TEXTURE_2D, 0);
   }
 
@@ -984,6 +1052,7 @@ private:
 #if !defined(HAS_GLES)
     if (m_vao)         { glDeleteVertexArrays(1, &m_vao);      m_vao = 0; }
 #endif
+    if (m_bgProgram6)  { glDeleteProgram(m_bgProgram6);        m_bgProgram6 = 0; }
     if (m_bgProgram4)  { glDeleteProgram(m_bgProgram4);        m_bgProgram4 = 0; }
     if (m_bgProgram3)  { glDeleteProgram(m_bgProgram3);        m_bgProgram3 = 0; }
     if (m_bgProgram2)  { glDeleteProgram(m_bgProgram2);        m_bgProgram2 = 0; }
@@ -1331,6 +1400,11 @@ private:
   GLint  m_locResolution4 = -1;
   GLint  m_locTime4       = -1;
 
+  GLuint m_bgProgram6     = 0;
+  GLint  m_locResolution6 = -1;
+  GLint  m_locTime6       = -1;
+  GLint  m_locAudio6      = -1;
+
   // Blur FBOs (half-res: bg→fboA, H-blur→fboB, V-blur→screen)
   GLuint m_fboA = 0, m_fboTexA = 0;
   GLuint m_fboB = 0, m_fboTexB = 0;
@@ -1342,6 +1416,8 @@ private:
   GLuint m_audioTex = 0;
   float  m_freqData[kAudioW] = {};
   float  m_waveData[kAudioW] = {};
+  std::vector<std::complex<float>> m_fftBuf    = std::vector<std::complex<float>>(kAudioW);
+  std::vector<uint8_t>             m_audioPixels = std::vector<uint8_t>(kAudioW * 2 * 4, 128);
 
   GLuint m_artTex = 0;
   int    m_texW = 0, m_texH = 0;
