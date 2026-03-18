@@ -5,14 +5,22 @@
       <group id="1">
         <setting id="shader" type="integer" label="32000">
           <level>0</level>
-          <default>0</default>
+          <default>1</default>
           <constraints>
             <options>
               <option label="32001" value="0"/>
               <option label="32002" value="1"/>
+              <option label="32003" value="2"/>
+              <option label="32004" value="3"/>
+              <option label="32005" value="4"/>
             </options>
           </constraints>
           <control type="spinner"/>
+        </setting>
+        <setting id="blur_enabled" type="boolean" label="32010">
+          <level>0</level>
+          <default>true</default>
+          <control type="toggle"/>
         </setting>
       </group>
     </category>

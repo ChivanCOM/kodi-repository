@@ -17,6 +17,22 @@ msgctxt "#32002"
 msgid "Metaballs"
 msgstr ""
 
+msgctxt "#32003"
+msgid "Nebula Ring"
+msgstr ""
+
+msgctxt "#32004"
+msgid "Wavy Lines"
+msgstr ""
+
+msgctxt "#32005"
+msgid "Tunnelwisp"
+msgstr ""
+
+msgctxt "#32010"
+msgid "Enable Background Blur"
+msgstr ""
+
 msgctxt "#32100"
 msgid "General"
 msgstr ""
