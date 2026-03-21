@@ -760,6 +760,114 @@ static const char* BG7_FRAG_SRC =
   "}\n";
 #endif
 
+// ── BG shader 8: Metaballs Chroma (album-art colour, 30% slower) ─────────────
+// Same ray-marcher as BG1 but speed scaled to 0.7× and coloured by the
+// dominant hue extracted from the current album art.
+
+static const char* BG8_FRAG_SRC =
+#if defined(HAS_GLES)
+  "#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
+  "precision highp float;\n"
+  "#else\n"
+  "precision mediump float;\n"
+  "#endif\n"
+  "uniform vec2  iResolution;\n"
+  "uniform float iTime;\n"
+  "uniform vec3  iArtColor;\n"
+  "\n"
+  "float opSmoothUnion(float d1,float d2,float k){\n"
+  "  float h=clamp(0.5+0.5*(d2-d1)/k,0.0,1.0);\n"
+  "  return mix(d2,d1,h)-k*h*(1.0-h);\n"
+  "}\n"
+  "float sdSphere(vec3 p,float s){return length(p)-s;}\n"
+  "float mapScene(vec3 p,float t){\n"
+  "  float d=2.0;\n"
+  "  for(int i=0;i<8;i++){\n"
+  "    float fi=float(i);\n"
+  "    float ts=t*(fract(fi*412.531+0.513)-0.5)*2.0;\n"
+  "    d=opSmoothUnion(\n"
+  "      sdSphere(p+sin(ts+fi*vec3(52.5126,64.62744,632.25))*vec3(2.0,2.0,0.8),\n"
+  "               mix(0.5,1.0,fract(fi*412.531+0.5124))),d,0.4);\n"
+  "  }\n"
+  "  return d;\n"
+  "}\n"
+  "vec3 calcNormal(vec3 p,float t){\n"
+  "  float h=0.00001;\n"
+  "  vec2 k=vec2(1.0,-1.0);\n"
+  "  return normalize(k.xyy*mapScene(p+k.xyy*h,t)+k.yyx*mapScene(p+k.yyx*h,t)\n"
+  "                  +k.yxy*mapScene(p+k.yxy*h,t)+k.xxx*mapScene(p+k.xxx*h,t));\n"
+  "}\n"
+  "void main(){\n"
+  "  float t=mod(iTime*0.7,100.0);\n"  // 30% slower; wrapped for mediump precision
+  "  vec2 uv=gl_FragCoord.xy/iResolution.xy;\n"
+  "  vec3 ro=vec3((uv-0.5)*vec2(iResolution.x/iResolution.y,1.0)*6.0,3.0);\n"
+  "  vec3 rd=vec3(0.0,0.0,-1.0);\n"
+  "  float depth=0.0;\n"
+  "  vec3 p=ro;\n"
+  "  for(int i=0;i<32;i++){\n"
+  "    p=ro+rd*depth;\n"
+  "    float dist=mapScene(p,t);\n"
+  "    depth+=dist;\n"
+  "    if(dist<0.00001)break;\n"
+  "  }\n"
+  "  depth=min(6.0,depth);\n"
+  "  vec3 n=calcNormal(p,t);\n"
+  "  float b=max(0.0,dot(n,vec3(0.577)));\n"
+  "  vec3 col=iArtColor*(0.15+0.85*b)*(0.85+b*0.35);\n"
+  "  col*=exp(-depth*0.15);\n"
+  "  gl_FragColor=vec4(col,1.0);\n"
+  "}\n";
+#else
+  "#version 150\n"
+  "uniform vec2  iResolution;\n"
+  "uniform float iTime;\n"
+  "uniform vec3  iArtColor;\n"
+  "out vec4 fragColor;\n"
+  "\n"
+  "float opSmoothUnion(float d1,float d2,float k){\n"
+  "  float h=clamp(0.5+0.5*(d2-d1)/k,0.0,1.0);\n"
+  "  return mix(d2,d1,h)-k*h*(1.0-h);\n"
+  "}\n"
+  "float sdSphere(vec3 p,float s){return length(p)-s;}\n"
+  "float mapScene(vec3 p,float t){\n"
+  "  float d=2.0;\n"
+  "  for(int i=0;i<8;i++){\n"
+  "    float fi=float(i);\n"
+  "    float ts=t*(fract(fi*412.531+0.513)-0.5)*2.0;\n"
+  "    d=opSmoothUnion(\n"
+  "      sdSphere(p+sin(ts+fi*vec3(52.5126,64.62744,632.25))*vec3(2.0,2.0,0.8),\n"
+  "               mix(0.5,1.0,fract(fi*412.531+0.5124))),d,0.4);\n"
+  "  }\n"
+  "  return d;\n"
+  "}\n"
+  "vec3 calcNormal(vec3 p,float t){\n"
+  "  float h=1e-5;\n"
+  "  vec2 k=vec2(1.0,-1.0);\n"
+  "  return normalize(k.xyy*mapScene(p+k.xyy*h,t)+k.yyx*mapScene(p+k.yyx*h,t)\n"
+  "                  +k.yxy*mapScene(p+k.yxy*h,t)+k.xxx*mapScene(p+k.xxx*h,t));\n"
+  "}\n"
+  "void main(){\n"
+  "  float t=mod(iTime*0.7,100.0);\n"
+  "  vec2 uv=gl_FragCoord.xy/iResolution.xy;\n"
+  "  vec3 ro=vec3((uv-0.5)*vec2(iResolution.x/iResolution.y,1.0)*6.0,3.0);\n"
+  "  vec3 rd=vec3(0.0,0.0,-1.0);\n"
+  "  float depth=0.0;\n"
+  "  vec3 p=ro;\n"
+  "  for(int i=0;i<32;i++){\n"
+  "    p=ro+rd*depth;\n"
+  "    float dist=mapScene(p,t);\n"
+  "    depth+=dist;\n"
+  "    if(dist<1e-6)break;\n"
+  "  }\n"
+  "  depth=min(6.0,depth);\n"
+  "  vec3 n=calcNormal(p,t);\n"
+  "  float b=max(0.0,dot(n,vec3(0.577)));\n"
+  "  vec3 col=iArtColor*(0.15+0.85*b)*(0.85+b*0.35);\n"
+  "  col*=exp(-depth*0.15);\n"
+  "  fragColor=vec4(col,1.0);\n"
+  "}\n";
+#endif
+
 // ── FFT (Cooley-Tukey radix-2) ────────────────────────────────────────────────
 
 static void ComputeFFTMagnitudes(const float* mono, int n, float* out,
@@ -978,6 +1086,13 @@ public:
       glBindTexture(GL_TEXTURE_2D, m_audioTex);
       glUniform1i(m_locAudio7, 0);
     }
+    else if (m_shaderIdx == 8)
+    {
+      glUseProgram(m_bgProgram8);
+      glUniform2f(m_locResolution8, (float)m_fboW, (float)m_fboH);
+      glUniform1f(m_locTime8, elapsed);
+      glUniform3f(m_locArtColor8, m_artColor[0], m_artColor[1], m_artColor[2]);
+    }
     else
     {
       glUseProgram(m_bgProgram0);
@@ -1132,6 +1247,12 @@ private:
     m_locResolution7 = glGetUniformLocation(m_bgProgram7, "iResolution");
     m_locAudio7      = glGetUniformLocation(m_bgProgram7, "iChannel0");
 
+    m_bgProgram8 = LinkProgram(VERT_SRC, BG8_FRAG_SRC);
+    if (!m_bgProgram8) return false;
+    m_locResolution8 = glGetUniformLocation(m_bgProgram8, "iResolution");
+    m_locTime8       = glGetUniformLocation(m_bgProgram8, "iTime");
+    m_locArtColor8   = glGetUniformLocation(m_bgProgram8, "iArtColor");
+
     glGenBuffers(1, &m_vbo);
 #if !defined(HAS_GLES)
     glGenVertexArrays(1, &m_vao);
@@ -1234,6 +1355,7 @@ private:
 #if !defined(HAS_GLES)
     if (m_vao)         { glDeleteVertexArrays(1, &m_vao);      m_vao = 0; }
 #endif
+    if (m_bgProgram8)  { glDeleteProgram(m_bgProgram8);        m_bgProgram8 = 0; }
     if (m_bgProgram7)  { glDeleteProgram(m_bgProgram7);        m_bgProgram7 = 0; }
     if (m_bgProgram6)  { glDeleteProgram(m_bgProgram6);        m_bgProgram6 = 0; }
     if (m_bgProgram4)  { glDeleteProgram(m_bgProgram4);        m_bgProgram4 = 0; }
@@ -1342,9 +1464,42 @@ private:
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
+    ComputeDominantColor(data, w, h);
     stbi_image_free(data);
     m_texW = w; m_texH = h; m_viewW = 0;
     return true;
+  }
+
+  // Sample image pixels with saturation weighting → store in m_artColor[3],
+  // normalised so max component = 0.7 (leaves headroom for shader lighting).
+  void ComputeDominantColor(const unsigned char* data, int w, int h)
+  {
+    double sumR = 0, sumG = 0, sumB = 0, totalW = 0;
+    int total = w * h;
+    int step  = std::max(1, total / 2048);
+    for (int i = 0; i < total; i += step)
+    {
+      float r = data[i * 4 + 0] / 255.0f;
+      float g = data[i * 4 + 1] / 255.0f;
+      float b = data[i * 4 + 2] / 255.0f;
+      float maxC = std::max({r, g, b});
+      float minC = std::min({r, g, b});
+      float sat  = (maxC > 0.01f) ? (maxC - minC) / maxC : 0.0f;
+      float wt   = sat + 0.05f;  // small base weight so grey albums still get a colour
+      sumR += r * wt; sumG += g * wt; sumB += b * wt; totalW += wt;
+    }
+    if (totalW > 0) {
+      m_artColor[0] = (float)(sumR / totalW);
+      m_artColor[1] = (float)(sumG / totalW);
+      m_artColor[2] = (float)(sumB / totalW);
+    } else {
+      m_artColor[0] = 0.5f; m_artColor[1] = 0.4f; m_artColor[2] = 0.8f;
+    }
+    float maxC = std::max({m_artColor[0], m_artColor[1], m_artColor[2]});
+    if (maxC > 0.05f) {
+      float scale = 0.7f / maxC;
+      m_artColor[0] *= scale; m_artColor[1] *= scale; m_artColor[2] *= scale;
+    }
   }
 
   void DeleteArtTexture()
@@ -1591,6 +1746,12 @@ private:
   GLuint m_bgProgram7     = 0;
   GLint  m_locResolution7 = -1;
   GLint  m_locAudio7      = -1;
+
+  GLuint m_bgProgram8     = 0;
+  GLint  m_locResolution8 = -1;
+  GLint  m_locTime8       = -1;
+  GLint  m_locArtColor8   = -1;
+  float  m_artColor[3]    = {0.5f, 0.4f, 0.8f};  // default purple; updated per album
 
   // Blur FBOs (half-res: bg→fboA, H-blur→fboB, V-blur→screen)
   GLuint m_fboA = 0, m_fboTexA = 0;
