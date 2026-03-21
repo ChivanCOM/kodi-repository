@@ -70,6 +70,20 @@ static const char* FRAG_SRC =
   "}\n";
 #endif
 
+// ── Solid colour shader (used for art shadow / glow) ─────────────────────────
+
+static const char* SOLID_FRAG_SRC =
+#if defined(HAS_GLES)
+  "precision mediump float;\n"
+  "uniform vec4 u_color;\n"
+  "void main() { gl_FragColor = u_color; }\n";
+#else
+  "#version 150\n"
+  "uniform vec4 u_color;\n"
+  "out vec4 fragColor;\n"
+  "void main() { fragColor = u_color; }\n";
+#endif
+
 // ── Separable Gaussian blur shader ───────────────────────────────────────────
 // u_dir = (1/w, 0) for horizontal pass, (0, 1/h) for vertical pass
 // 5-tap binomial kernel, step = 1.5 texels for wider spread
@@ -1146,7 +1160,18 @@ public:
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     if (m_artTex && m_texW > 0)
+    {
+      // Layered coloured shadow behind the album art (3 concentric rects)
+      float px = m_ndcPerPx, py = m_ndcPerPxH;
+      float ox = 2.f * px, oy = -2.f * py;  // slight down-right offset
+      float r = m_artColor[0], g = m_artColor[1], b = m_artColor[2];
+      struct { float sp, al; } layers[] = { {12.f,.10f}, {7.f,.17f}, {3.f,.25f} };
+      for (auto& l : layers)
+        DrawSolidRect(m_artX0 - l.sp*px + ox, m_artY0 - l.sp*py + oy,
+                      m_artX1 + l.sp*px + ox, m_artY1 + l.sp*py + oy,
+                      r, g, b, l.al);
       DrawQuad(m_artTex, m_artX0, m_artY0, m_artX1, m_artY1, 1.0f);
+    }
 
     DrawTextTex(m_texTitle,  m_titleX,  m_titleY,
                 m_titleX  + m_texTitle.w  * m_ndcPerPx, m_titleY  + m_texTitle.h  * m_ndcPerPxH);
@@ -1203,6 +1228,10 @@ private:
     if (!m_program) return false;
     m_locTex   = glGetUniformLocation(m_program, "u_tex");
     m_locAlpha = glGetUniformLocation(m_program, "u_alpha");
+
+    m_solidProgram = LinkProgram(VERT_SRC, SOLID_FRAG_SRC);
+    if (!m_solidProgram) return false;
+    m_locSolidColor = glGetUniformLocation(m_solidProgram, "u_color");
 
     m_blurProgram = LinkProgram(VERT_SRC, BLUR_FRAG_SRC);
     if (!m_blurProgram) return false;
@@ -1363,8 +1392,9 @@ private:
     if (m_bgProgram2)  { glDeleteProgram(m_bgProgram2);        m_bgProgram2 = 0; }
     if (m_bgProgram1)  { glDeleteProgram(m_bgProgram1);        m_bgProgram1 = 0; }
     if (m_bgProgram0)  { glDeleteProgram(m_bgProgram0);        m_bgProgram0 = 0; }
-    if (m_blurProgram) { glDeleteProgram(m_blurProgram);       m_blurProgram = 0; }
-    if (m_program)     { glDeleteProgram(m_program);           m_program = 0; }
+    if (m_blurProgram)  { glDeleteProgram(m_blurProgram);       m_blurProgram = 0; }
+    if (m_solidProgram) { glDeleteProgram(m_solidProgram);      m_solidProgram = 0; }
+    if (m_program)      { glDeleteProgram(m_program);           m_program = 0; }
     m_glReady = false;
   }
 
@@ -1412,6 +1442,29 @@ private:
     glBindVertexArray(m_vao); glDrawArrays(GL_TRIANGLE_FAN, 0, 4); glBindVertexArray(0);
 #endif
     glBindBuffer(GL_ARRAY_BUFFER, 0); glBindTexture(GL_TEXTURE_2D, 0);
+  }
+
+  void DrawSolidRect(float x0, float y0, float x1, float y1, float r, float g, float b, float a)
+  {
+    float verts[16] = {
+      x0,y0, 0.f,0.f,  x1,y0, 1.f,0.f,
+      x1,y1, 1.f,1.f,  x0,y1, 0.f,1.f,
+    };
+    glUseProgram(m_solidProgram);
+    glUniform4f(m_locSolidColor, r, g, b, a);
+    glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(verts), verts);
+#if defined(HAS_GLES)
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+#else
+    glBindVertexArray(m_vao); glDrawArrays(GL_TRIANGLE_FAN, 0, 4); glBindVertexArray(0);
+#endif
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glUseProgram(m_program);  // restore overlay program
   }
 
   void DrawTextTex(const TextTex& t, float x0, float y0, float x1, float y1)
@@ -1747,9 +1800,12 @@ private:
   int    m_shaderIdx     = 1;
   bool   m_blurEnabled   = true;
 
-  GLuint m_program  = 0;
-  GLint  m_locTex   = -1;
-  GLint  m_locAlpha = -1;
+  GLuint m_program      = 0;
+  GLint  m_locTex       = -1;
+  GLint  m_locAlpha     = -1;
+
+  GLuint m_solidProgram  = 0;
+  GLint  m_locSolidColor = -1;
 
   GLuint m_blurProgram = 0;
   GLint  m_locBlurTex  = -1;
