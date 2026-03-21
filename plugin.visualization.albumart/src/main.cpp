@@ -1161,11 +1161,17 @@ public:
 
     if (m_artTex && m_texW > 0)
     {
-      // Layered coloured shadow behind the album art (3 concentric rects)
+      // Gaussian-approximated shadow, 8 concentric rects outer→inner.
+      // Light source matches metaballs: normalize(1,1,1) = top-right,
+      // so shadow falls bottom-left (negative X, negative Y in NDC Y-up).
       float px = m_ndcPerPx, py = m_ndcPerPxH;
-      float ox = 2.f * px, oy = -2.f * py;  // slight down-right offset
+      float ox = -5.f * px, oy = -5.f * py;  // bottom-left, matching top-right light
       float r = m_artColor[0], g = m_artColor[1], b = m_artColor[2];
-      struct { float sp, al; } layers[] = { {12.f,.10f}, {7.f,.17f}, {3.f,.25f} };
+      // sp = spread in pixels; al = per-layer alpha (Gaussian profile, draw outer first)
+      struct { float sp, al; } layers[] = {
+        {22.f,.025f},{16.f,.040f},{11.f,.055f},{ 7.f,.070f},
+        { 4.f,.085f},{ 2.f,.095f},{ 1.f,.100f},{ 0.f,.110f},
+      };
       for (auto& l : layers)
         DrawSolidRect(m_artX0 - l.sp*px + ox, m_artY0 - l.sp*py + oy,
                       m_artX1 + l.sp*px + ox, m_artY1 + l.sp*py + oy,
