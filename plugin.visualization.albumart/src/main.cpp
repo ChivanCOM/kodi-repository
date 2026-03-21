@@ -227,6 +227,8 @@ static const char* BG1_FRAG_SRC =
   "#endif\n"
   "uniform vec2  iResolution;\n"
   "uniform float iTime;\n"
+  "uniform vec3  iHighlightColor;\n"
+  "uniform vec3  iDarkColor;\n"
   "\n"
   "float opSmoothUnion(float d1,float d2,float k){\n"
   "  float h=clamp(0.5+0.5*(d2-d1)/k,0.0,1.0);\n"
@@ -266,7 +268,7 @@ static const char* BG1_FRAG_SRC =
   "  depth=min(6.0,depth);\n"
   "  vec3 n=calcNormal(p);\n"
   "  float b=max(0.0,dot(n,vec3(0.577)));\n"
-  "  vec3 col=(0.5+0.5*cos((b+iTime*3.0)+uv.xyx*2.0+vec3(0.0,2.0,4.0)))*(0.85+b*0.35);\n"
+  "  vec3 col=mix(iDarkColor,iHighlightColor,b*(0.85+b*0.35));\n"
   "  col*=exp(-depth*0.15);\n"
   "  gl_FragColor=vec4(col,1.0);\n"
   "}\n";
@@ -274,6 +276,8 @@ static const char* BG1_FRAG_SRC =
   "#version 150\n"
   "uniform vec2  iResolution;\n"
   "uniform float iTime;\n"
+  "uniform vec3  iHighlightColor;\n"
+  "uniform vec3  iDarkColor;\n"
   "out vec4 fragColor;\n"
   "\n"
   "float opSmoothUnion(float d1,float d2,float k){\n"
@@ -314,7 +318,7 @@ static const char* BG1_FRAG_SRC =
   "  depth=min(6.0,depth);\n"
   "  vec3 n=calcNormal(p);\n"
   "  float b=max(0.0,dot(n,vec3(0.577)));\n"
-  "  vec3 col=(0.5+0.5*cos((b+iTime*3.0)+uv.xyx*2.0+vec3(0.0,2.0,4.0)))*(0.85+b*0.35);\n"
+  "  vec3 col=mix(iDarkColor,iHighlightColor,b*(0.85+b*0.35));\n"
   "  col*=exp(-depth*0.15);\n"
   "  fragColor=vec4(col,1.0);\n"
   "}\n";
@@ -789,7 +793,8 @@ static const char* BG8_FRAG_SRC =
   "#endif\n"
   "uniform vec2  iResolution;\n"
   "uniform float iTime;\n"
-  "uniform vec3  iArtColor;\n"
+  "uniform vec3  iHighlightColor;\n"
+  "uniform vec3  iDarkColor;\n"
   "\n"
   "float opSmoothUnion(float d1,float d2,float k){\n"
   "  float h=clamp(0.5+0.5*(d2-d1)/k,0.0,1.0);\n"
@@ -830,7 +835,7 @@ static const char* BG8_FRAG_SRC =
   "  depth=min(6.0,depth);\n"
   "  vec3 n=calcNormal(p,t);\n"
   "  float b=max(0.0,dot(n,vec3(0.577)));\n"
-  "  vec3 col=iArtColor*(0.15+0.85*b)*(0.85+b*0.35);\n"
+  "  vec3 col=mix(iDarkColor,iHighlightColor,b*(0.85+b*0.35));\n"
   "  col*=exp(-depth*0.15);\n"
   "  gl_FragColor=vec4(col,1.0);\n"
   "}\n";
@@ -838,7 +843,8 @@ static const char* BG8_FRAG_SRC =
   "#version 150\n"
   "uniform vec2  iResolution;\n"
   "uniform float iTime;\n"
-  "uniform vec3  iArtColor;\n"
+  "uniform vec3  iHighlightColor;\n"
+  "uniform vec3  iDarkColor;\n"
   "out vec4 fragColor;\n"
   "\n"
   "float opSmoothUnion(float d1,float d2,float k){\n"
@@ -880,7 +886,7 @@ static const char* BG8_FRAG_SRC =
   "  depth=min(6.0,depth);\n"
   "  vec3 n=calcNormal(p,t);\n"
   "  float b=max(0.0,dot(n,vec3(0.577)));\n"
-  "  vec3 col=iArtColor*(0.15+0.85*b)*(0.85+b*0.35);\n"
+  "  vec3 col=mix(iDarkColor,iHighlightColor,b*(0.85+b*0.35));\n"
   "  col*=exp(-depth*0.15);\n"
   "  fragColor=vec4(col,1.0);\n"
   "}\n";
@@ -1060,6 +1066,8 @@ public:
       glUseProgram(m_bgProgram1);
       glUniform2f(m_locResolution1, (float)m_fboW, (float)m_fboH);
       glUniform1f(m_locTime1, elapsed);
+      glUniform3f(m_locHighlight1, m_highlightColor[0], m_highlightColor[1], m_highlightColor[2]);
+      glUniform3f(m_locDark1,      m_darkColor[0],      m_darkColor[1],      m_darkColor[2]);
     }
     else if (m_shaderIdx == 2)
     {
@@ -1109,7 +1117,8 @@ public:
       glUseProgram(m_bgProgram8);
       glUniform2f(m_locResolution8, (float)m_fboW, (float)m_fboH);
       glUniform1f(m_locTime8, elapsed);
-      glUniform3f(m_locArtColor8, m_artColor[0], m_artColor[1], m_artColor[2]);
+      glUniform3f(m_locHighlight8, m_highlightColor[0], m_highlightColor[1], m_highlightColor[2]);
+      glUniform3f(m_locDark8,      m_darkColor[0],      m_darkColor[1],      m_darkColor[2]);
     }
     else
     {
@@ -1165,21 +1174,10 @@ public:
 
     if (m_artTex && m_texW > 0)
     {
-      // Gaussian-approximated shadow, 8 concentric rects outer→inner.
-      // Light source matches metaballs: normalize(1,1,1) = top-right,
-      // so shadow falls bottom-left (negative X, negative Y in NDC Y-up).
-      float px = m_ndcPerPx, py = m_ndcPerPxH;
-      float ox = -5.f * px, oy = -5.f * py;  // bottom-left, matching top-right light
-      float r = m_artColor[0], g = m_artColor[1], b = m_artColor[2];
-      // sp = spread in pixels; al = per-layer alpha (Gaussian profile, draw outer first)
-      struct { float sp, al; } layers[] = {
-        {22.f,.025f},{16.f,.040f},{11.f,.055f},{ 7.f,.070f},
-        { 4.f,.085f},{ 2.f,.095f},{ 1.f,.100f},{ 0.f,.110f},
-      };
-      for (auto& l : layers)
-        DrawSolidRect(m_artX0 - l.sp*px + ox, m_artY0 - l.sp*py + oy,
-                      m_artX1 + l.sp*px + ox, m_artY1 + l.sp*py + oy,
-                      r, g, b, l.al);
+      // Solid outline — 4 px border on all sides using the art highlight colour
+      float bx = 4.f * m_ndcPerPx, by = 4.f * m_ndcPerPxH;
+      DrawSolidRect(m_artX0 - bx, m_artY0 - by, m_artX1 + bx, m_artY1 + by,
+                    m_highlightColor[0], m_highlightColor[1], m_highlightColor[2], 0.80f);
       DrawQuad(m_artTex, m_artX0, m_artY0, m_artX1, m_artY1, 1.0f);
     }
 
@@ -1258,6 +1256,8 @@ private:
     if (!m_bgProgram1) return false;
     m_locResolution1 = glGetUniformLocation(m_bgProgram1, "iResolution");
     m_locTime1       = glGetUniformLocation(m_bgProgram1, "iTime");
+    m_locHighlight1  = glGetUniformLocation(m_bgProgram1, "iHighlightColor");
+    m_locDark1       = glGetUniformLocation(m_bgProgram1, "iDarkColor");
 
     m_bgProgram2 = LinkProgram(VERT_SRC, BG2_FRAG_SRC);
     if (!m_bgProgram2) return false;
@@ -1290,7 +1290,8 @@ private:
     if (!m_bgProgram8) return false;
     m_locResolution8 = glGetUniformLocation(m_bgProgram8, "iResolution");
     m_locTime8       = glGetUniformLocation(m_bgProgram8, "iTime");
-    m_locArtColor8   = glGetUniformLocation(m_bgProgram8, "iArtColor");
+    m_locHighlight8  = glGetUniformLocation(m_bgProgram8, "iHighlightColor");
+    m_locDark8       = glGetUniformLocation(m_bgProgram8, "iDarkColor");
 
     glGenBuffers(1, &m_vbo);
 #if !defined(HAS_GLES)
@@ -1527,51 +1528,33 @@ private:
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindTexture(GL_TEXTURE_2D, 0);
-    ComputeDominantColor(data, w, h);
+    ComputeArtPalette(data, w, h);
     stbi_image_free(data);
     m_texW = w; m_texH = h; m_viewW = 0;
     return true;
   }
 
-  // Sample image pixels with saturation weighting → store in m_artColor[3],
-  // saturation-boosted and normalised so max component = 0.9.
-  void ComputeDominantColor(const unsigned char* data, int w, int h)
+  // Sort up to 2048 sampled pixels by luminance; average bottom 15% → m_darkColor,
+  // top 15% → m_highlightColor. Used for metaballs coloring and art outline.
+  void ComputeArtPalette(const unsigned char* data, int w, int h)
   {
-    double sumR = 0, sumG = 0, sumB = 0, totalW = 0;
     int total = w * h;
     int step  = std::max(1, total / 2048);
-    for (int i = 0; i < total; i += step)
-    {
-      float r = data[i * 4 + 0] / 255.0f;
-      float g = data[i * 4 + 1] / 255.0f;
-      float b = data[i * 4 + 2] / 255.0f;
-      float maxC = std::max({r, g, b});
-      float minC = std::min({r, g, b});
-      float sat  = (maxC > 0.01f) ? (maxC - minC) / maxC : 0.0f;
-      float wt   = sat + 0.05f;
-      sumR += r * wt; sumG += g * wt; sumB += b * wt; totalW += wt;
+    struct Pix { float r, g, b, lum; };
+    std::vector<Pix> pix;
+    pix.reserve(2048);
+    for (int i = 0; i < total; i += step) {
+      float r = data[i*4+0] / 255.f, g = data[i*4+1] / 255.f, b = data[i*4+2] / 255.f;
+      pix.push_back({r, g, b, 0.299f*r + 0.587f*g + 0.114f*b});
     }
-    if (totalW > 0) {
-      m_artColor[0] = (float)(sumR / totalW);
-      m_artColor[1] = (float)(sumG / totalW);
-      m_artColor[2] = (float)(sumB / totalW);
-    } else {
-      m_artColor[0] = 0.5f; m_artColor[1] = 0.4f; m_artColor[2] = 0.8f;
-    }
-    // Boost saturation 1.5× — push away from perceptual luminance
-    float lum = m_artColor[0] * 0.299f + m_artColor[1] * 0.587f + m_artColor[2] * 0.114f;
-    m_artColor[0] = lum + (m_artColor[0] - lum) * 1.5f;
-    m_artColor[1] = lum + (m_artColor[1] - lum) * 1.5f;
-    m_artColor[2] = lum + (m_artColor[2] - lum) * 1.5f;
-    m_artColor[0] = std::max(0.0f, m_artColor[0]);
-    m_artColor[1] = std::max(0.0f, m_artColor[1]);
-    m_artColor[2] = std::max(0.0f, m_artColor[2]);
-    // Normalise to max component = 0.9 (was 0.7 — ~30% brighter)
-    float maxC = std::max({m_artColor[0], m_artColor[1], m_artColor[2]});
-    if (maxC > 0.05f) {
-      float scale = 0.9f / maxC;
-      m_artColor[0] *= scale; m_artColor[1] *= scale; m_artColor[2] *= scale;
-    }
+    std::sort(pix.begin(), pix.end(), [](const Pix& a, const Pix& b){ return a.lum < b.lum; });
+    int n = (int)pix.size();
+    int lo = std::max(1, n * 15 / 100);
+    double dR=0,dG=0,dB=0, hR=0,hG=0,hB=0;
+    for (int j = 0; j < lo; j++)       { dR+=pix[j].r; dG+=pix[j].g; dB+=pix[j].b; }
+    for (int j = n-lo; j < n; j++)     { hR+=pix[j].r; hG+=pix[j].g; hB+=pix[j].b; }
+    m_darkColor[0]      = (float)(dR/lo); m_darkColor[1]      = (float)(dG/lo); m_darkColor[2]      = (float)(dB/lo);
+    m_highlightColor[0] = (float)(hR/lo); m_highlightColor[1] = (float)(hG/lo); m_highlightColor[2] = (float)(hB/lo);
   }
 
   void DeleteArtTexture()
@@ -1855,8 +1838,12 @@ private:
   GLuint m_bgProgram8     = 0;
   GLint  m_locResolution8 = -1;
   GLint  m_locTime8       = -1;
-  GLint  m_locArtColor8   = -1;
-  float  m_artColor[3]    = {0.5f, 0.4f, 0.8f};  // default purple; updated per album
+  GLint  m_locHighlight1  = -1;
+  GLint  m_locDark1       = -1;
+  GLint  m_locHighlight8  = -1;
+  GLint  m_locDark8       = -1;
+  float  m_highlightColor[3] = {0.85f, 0.85f, 0.90f};  // default; updated per album
+  float  m_darkColor[3]      = {0.04f, 0.04f, 0.08f};
 
   // Blur FBOs (half-res: bg→fboA, H-blur→fboB, V-blur→screen)
   GLuint m_fboA = 0, m_fboTexA = 0;
