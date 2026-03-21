@@ -1471,7 +1471,7 @@ private:
   }
 
   // Sample image pixels with saturation weighting → store in m_artColor[3],
-  // normalised so max component = 0.7 (leaves headroom for shader lighting).
+  // saturation-boosted and normalised so max component = 0.9.
   void ComputeDominantColor(const unsigned char* data, int w, int h)
   {
     double sumR = 0, sumG = 0, sumB = 0, totalW = 0;
@@ -1485,7 +1485,7 @@ private:
       float maxC = std::max({r, g, b});
       float minC = std::min({r, g, b});
       float sat  = (maxC > 0.01f) ? (maxC - minC) / maxC : 0.0f;
-      float wt   = sat + 0.05f;  // small base weight so grey albums still get a colour
+      float wt   = sat + 0.05f;
       sumR += r * wt; sumG += g * wt; sumB += b * wt; totalW += wt;
     }
     if (totalW > 0) {
@@ -1495,9 +1495,18 @@ private:
     } else {
       m_artColor[0] = 0.5f; m_artColor[1] = 0.4f; m_artColor[2] = 0.8f;
     }
+    // Boost saturation 1.5× — push away from perceptual luminance
+    float lum = m_artColor[0] * 0.299f + m_artColor[1] * 0.587f + m_artColor[2] * 0.114f;
+    m_artColor[0] = lum + (m_artColor[0] - lum) * 1.5f;
+    m_artColor[1] = lum + (m_artColor[1] - lum) * 1.5f;
+    m_artColor[2] = lum + (m_artColor[2] - lum) * 1.5f;
+    m_artColor[0] = std::max(0.0f, m_artColor[0]);
+    m_artColor[1] = std::max(0.0f, m_artColor[1]);
+    m_artColor[2] = std::max(0.0f, m_artColor[2]);
+    // Normalise to max component = 0.9 (was 0.7 — ~30% brighter)
     float maxC = std::max({m_artColor[0], m_artColor[1], m_artColor[2]});
     if (maxC > 0.05f) {
-      float scale = 0.7f / maxC;
+      float scale = 0.9f / maxC;
       m_artColor[0] *= scale; m_artColor[1] *= scale; m_artColor[2] *= scale;
     }
   }
