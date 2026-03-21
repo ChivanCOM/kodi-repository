@@ -1539,20 +1539,22 @@ private:
   void ComputeArtPalette(const unsigned char* data, int w, int h)
   {
     int total = w * h;
-    int step  = std::max(1, total / 2048);
+    // Sample up to 10 000 pixels (every pixel for small images)
+    int step = std::max(1, total / 10000);
     struct Pix { float r, g, b, lum; };
     std::vector<Pix> pix;
-    pix.reserve(2048);
+    pix.reserve(std::min(total, 10000));
     for (int i = 0; i < total; i += step) {
       float r = data[i*4+0] / 255.f, g = data[i*4+1] / 255.f, b = data[i*4+2] / 255.f;
       pix.push_back({r, g, b, 0.299f*r + 0.587f*g + 0.114f*b});
     }
+    // Sort by luminance: bottom 15% = background (darkest), top 15% = foreground (lightest)
     std::sort(pix.begin(), pix.end(), [](const Pix& a, const Pix& b){ return a.lum < b.lum; });
     int n = (int)pix.size();
     int lo = std::max(1, n * 15 / 100);
     double dR=0,dG=0,dB=0, hR=0,hG=0,hB=0;
-    for (int j = 0; j < lo; j++)       { dR+=pix[j].r; dG+=pix[j].g; dB+=pix[j].b; }
-    for (int j = n-lo; j < n; j++)     { hR+=pix[j].r; hG+=pix[j].g; hB+=pix[j].b; }
+    for (int j = 0;    j < lo;     j++) { dR+=pix[j].r; dG+=pix[j].g; dB+=pix[j].b; }
+    for (int j = n-lo; j < n;      j++) { hR+=pix[j].r; hG+=pix[j].g; hB+=pix[j].b; }
     m_darkColor[0]      = (float)(dR/lo); m_darkColor[1]      = (float)(dG/lo); m_darkColor[2]      = (float)(dB/lo);
     m_highlightColor[0] = (float)(hR/lo); m_highlightColor[1] = (float)(hG/lo); m_highlightColor[2] = (float)(hB/lo);
   }
