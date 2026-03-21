@@ -253,6 +253,7 @@ static const char* BG1_FRAG_SRC =
   "void main(){\n"
   "  vec2 uv=gl_FragCoord.xy/iResolution.xy;\n"
   "  vec3 ro=vec3((uv-0.5)*vec2(iResolution.x/iResolution.y,1.0)*6.0,3.0);\n"
+  "  ro.x-=1.2;\n"
   "  vec3 rd=vec3(0.0,0.0,-1.0);\n"
   "  float depth=0.0;\n"
   "  vec3 p=ro;\n"
@@ -300,6 +301,7 @@ static const char* BG1_FRAG_SRC =
   "void main(){\n"
   "  vec2 uv=gl_FragCoord.xy/iResolution.xy;\n"
   "  vec3 ro=vec3((uv-0.5)*vec2(iResolution.x/iResolution.y,1.0)*6.0,3.0);\n"
+  "  ro.x-=1.2;\n"
   "  vec3 rd=vec3(0.0,0.0,-1.0);\n"
   "  float depth=0.0;\n"
   "  vec3 p=ro;\n"
@@ -815,6 +817,7 @@ static const char* BG8_FRAG_SRC =
   "  float t=mod(iTime*0.7,100.0);\n"  // 30% slower; wrapped for mediump precision
   "  vec2 uv=gl_FragCoord.xy/iResolution.xy;\n"
   "  vec3 ro=vec3((uv-0.5)*vec2(iResolution.x/iResolution.y,1.0)*6.0,3.0);\n"
+  "  ro.x-=1.2;\n"
   "  vec3 rd=vec3(0.0,0.0,-1.0);\n"
   "  float depth=0.0;\n"
   "  vec3 p=ro;\n"
@@ -864,6 +867,7 @@ static const char* BG8_FRAG_SRC =
   "  float t=mod(iTime*0.7,100.0);\n"
   "  vec2 uv=gl_FragCoord.xy/iResolution.xy;\n"
   "  vec3 ro=vec3((uv-0.5)*vec2(iResolution.x/iResolution.y,1.0)*6.0,3.0);\n"
+  "  ro.x-=1.2;\n"
   "  vec3 rd=vec3(0.0,0.0,-1.0);\n"
   "  float depth=0.0;\n"
   "  vec3 p=ro;\n"
@@ -1783,8 +1787,8 @@ private:
     float hAlbum  = m_texAlbum.h  * m_ndcPerPxH;
     // Title → Artist gap (larger): golden-ratio proportion of average text height
     float gapTA   = (hTitle + hArtist) * 0.5f * (kPhi - 1.f) * 0.5f;
-    // Artist → Album gap (tighter by φ): artist and album are related metadata
-    float gapAA   = gapTA / kPhi;
+    // Artist → Album gap (half of title→artist): album clusters tightly under artist
+    float gapAA   = gapTA * 0.5f;
     float blockH  = hTitle + gapTA + hArtist + gapAA + hAlbum;
 
     float blockTop = m_artY1 - (artHNdc - blockH) * 0.5f;
