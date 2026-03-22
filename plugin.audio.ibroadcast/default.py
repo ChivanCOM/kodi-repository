@@ -42,6 +42,43 @@ def _get_meta():
     )
 
 
+def _prefetch_metadata(api):
+    """Pre-warm the metadata cache for all artists and albums. Called by refresh_library."""
+    meta = _get_meta()
+
+    artists      = api.get_artists()
+    artist_names = [a["name"] for a in artists]
+
+    albums = api.get_albums()
+    artist_album_pairs = [
+        (api.get_artist_name(alb["artist_id"]), alb["name"])
+        for alb in albums
+        if api.get_artist_name(alb["artist_id"])
+    ]
+
+    pd = xbmcgui.DialogProgress()
+    pd.create("iBroadcast", "Prefetching metadata…")
+
+    total = len(artist_names) + len(artist_album_pairs)
+
+    def on_artist(i, _total, name):
+        if pd.iscanceled():
+            return
+        pct = int(i * 100 / total)
+        pd.update(pct, f"Artists ({i + 1}/{len(artist_names)}): {name}")
+
+    def on_album(i, _total, name):
+        if pd.iscanceled():
+            return
+        pct = int((len(artist_names) + i) * 100 / total)
+        pd.update(pct, f"Albums ({i + 1}/{len(artist_album_pairs)}): {name}")
+
+    meta.prefetch_artists(artist_names,      on_progress=on_artist, is_cancelled=pd.iscanceled)
+    meta.prefetch_albums(artist_album_pairs, on_progress=on_album,  is_cancelled=pd.iscanceled)
+
+    pd.close()
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -182,12 +219,11 @@ def list_albums(artist_id=None):
     meta   = _get_meta()
     albums = api.get_albums(artist_id=artist_id)
 
-    # When browsing a specific artist fetch full metadata (1 set of HTTP calls, then cached)
     artist_meta = {}
     if artist_id:
         artist_name_for_meta = api.get_artist_name(artist_id)
         if artist_name_for_meta:
-            artist_meta = meta.get_artist_info(artist_name_for_meta)
+            artist_meta = meta.get_artist_info_cached(artist_name_for_meta)
             if artist_meta.get("fanart"):
                 try:
                     xbmcplugin.setPluginFanart(HANDLE, artist_meta["fanart"])
@@ -230,13 +266,12 @@ def list_tracks(album_id=None, artist_id=None, playlist_id=None):
     meta   = _get_meta()
     tracks = api.get_tracks(album_id=album_id, artist_id=artist_id, playlist_id=playlist_id)
 
-    # When browsing a specific album fetch metadata once for all tracks (then cached)
     album_meta = {}
     if album_id and tracks:
-        alb_name    = api.get_album_name(album_id)
-        alb_artist  = api.get_artist_name(tracks[0]["artist_id"])
+        alb_name   = api.get_album_name(album_id)
+        alb_artist = api.get_artist_name(tracks[0]["artist_id"])
         if alb_name and alb_artist:
-            album_meta = meta.get_album_info(alb_artist, alb_name)
+            album_meta = meta.get_album_info_cached(alb_artist, alb_name)
 
     xbmcplugin.setContent(HANDLE, "songs")
     for track in tracks:
@@ -397,12 +432,11 @@ def refresh_library():
     if not api:
         return
     ok = api.load_library(force_refresh=True)
-    if ok:
-        xbmcgui.Dialog().notification(
-            "iBroadcast", "Library refreshed", xbmcgui.NOTIFICATION_INFO
-        )
-    else:
+    if not ok:
         xbmcgui.Dialog().ok("iBroadcast", "Failed to refresh library.")
+        return
+    xbmcgui.Dialog().notification("iBroadcast", "Library refreshed", xbmcgui.NOTIFICATION_INFO)
+    _prefetch_metadata(api)
 
 
 # ---------------------------------------------------------------------------
