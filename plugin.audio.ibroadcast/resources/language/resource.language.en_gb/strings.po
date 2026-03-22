@@ -43,3 +43,15 @@ msgstr ""
 msgctxt "#32024"
 msgid "320 kbps"
 msgstr ""
+
+msgctxt "#32030"
+msgid "Metadata"
+msgstr ""
+
+msgctxt "#32031"
+msgid "FanArt.tv API Key"
+msgstr ""
+
+msgctxt "#32032"
+msgid "Optional. Get a free personal API key at fanart.tv to enable high-resolution artist and album artwork."
+msgstr ""

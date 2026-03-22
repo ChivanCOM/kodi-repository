@@ -32,6 +32,14 @@ def get_bitrate():
 
 sys.path.insert(0, os.path.join(ADDON.getAddonInfo("path"), "lib"))
 from ibroadcast import IBroadcastAPI, IBroadcastError
+from metadata import MetadataClient
+
+
+def _get_meta():
+    return MetadataClient(
+        PROFILE_PATH,
+        fanart_api_key=ADDON.getSetting("fanart_tv_api_key") or "",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -138,15 +146,28 @@ def list_artists():
     if not api:
         return
 
+    meta = _get_meta()
     xbmcplugin.setContent(HANDLE, "artists")
     for artist in api.get_artists():
         li = xbmcgui.ListItem(label=artist["name"])
-        li.setInfo("music", {"artist": artist["name"]})
-        art_url = api.get_artwork_url(artist.get("artwork_id"))
-        if art_url:
-            li.setArt({"thumb": art_url, "icon": art_url, "fanart": art_url})
-        else:
-            li.setArt({"icon": "DefaultArtist.png"})
+
+        ib_art = api.get_artwork_url(artist.get("artwork_id"))
+        art  = {"thumb": ib_art, "icon": ib_art} if ib_art else {"icon": "DefaultArtist.png"}
+        info = {"artist": artist["name"]}
+
+        cached = meta.get_artist_info_cached(artist["name"])
+        if cached:
+            if cached.get("thumb") and not ib_art:
+                art["thumb"] = art["icon"] = cached["thumb"]
+            if cached.get("fanart"):    art["fanart"]    = cached["fanart"]
+            if cached.get("clearlogo"): art["clearlogo"] = cached["clearlogo"]
+            if cached.get("clearart"):  art["clearart"]  = cached["clearart"]
+            if cached.get("banner"):    art["banner"]    = cached["banner"]
+            if cached.get("biography"): info["comment"]  = cached["biography"]
+            if cached.get("genre"):     info["genre"]    = cached["genre"]
+
+        li.setInfo("music", info)
+        li.setArt(art)
         xbmcplugin.addDirectoryItem(HANDLE, build_url("artist_albums", artist_id=artist["id"]), li, True)
 
     xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_LABEL_IGNORE_THE)
@@ -158,21 +179,40 @@ def list_albums(artist_id=None):
     if not api:
         return
 
+    meta   = _get_meta()
     albums = api.get_albums(artist_id=artist_id)
+
+    # When browsing a specific artist fetch full metadata (1 set of HTTP calls, then cached)
+    artist_meta = {}
+    if artist_id:
+        artist_name_for_meta = api.get_artist_name(artist_id)
+        if artist_name_for_meta:
+            artist_meta = meta.get_artist_info(artist_name_for_meta)
+            if artist_meta.get("fanart"):
+                try:
+                    xbmcplugin.setPluginFanart(HANDLE, artist_meta["fanart"])
+                except Exception:
+                    pass
+
     xbmcplugin.setContent(HANDLE, "albums")
     for album in albums:
         artist_name = api.get_artist_name(album["artist_id"])
-        label = album["name"]
-        li = xbmcgui.ListItem(label=label)
+        li = xbmcgui.ListItem(label=album["name"])
         info = {"album": album["name"], "artist": artist_name}
         if album.get("year"):
             info["year"] = int(album["year"])
-        li.setInfo("music", info)
+        if artist_meta.get("biography"): info["comment"] = artist_meta["biography"]
+        if artist_meta.get("genre"):     info["genre"]   = artist_meta["genre"]
+
         art_url = api.get_artwork_url(album.get("artwork_id"))
-        if art_url:
-            li.setArt({"thumb": art_url, "icon": art_url, "fanart": art_url})
-        else:
-            li.setArt({"icon": "DefaultAlbumCover.png"})
+        art = {"thumb": art_url, "icon": art_url} if art_url else {"icon": "DefaultAlbumCover.png"}
+        if artist_meta.get("fanart"):    art["fanart"]    = artist_meta["fanart"]
+        if artist_meta.get("clearlogo"): art["clearlogo"] = artist_meta["clearlogo"]
+        if artist_meta.get("clearart"):  art["clearart"]  = artist_meta["clearart"]
+        if artist_meta.get("banner"):    art["banner"]    = artist_meta["banner"]
+
+        li.setInfo("music", info)
+        li.setArt(art)
         xbmcplugin.addDirectoryItem(
             HANDLE, build_url("album_tracks", album_id=album["id"]), li, True
         )
@@ -187,26 +227,42 @@ def list_tracks(album_id=None, artist_id=None, playlist_id=None):
     if not api:
         return
 
+    meta   = _get_meta()
     tracks = api.get_tracks(album_id=album_id, artist_id=artist_id, playlist_id=playlist_id)
+
+    # When browsing a specific album fetch metadata once for all tracks (then cached)
+    album_meta = {}
+    if album_id and tracks:
+        alb_name    = api.get_album_name(album_id)
+        alb_artist  = api.get_artist_name(tracks[0]["artist_id"])
+        if alb_name and alb_artist:
+            album_meta = meta.get_album_info(alb_artist, alb_name)
+
     xbmcplugin.setContent(HANDLE, "songs")
     for track in tracks:
         artist_name = api.get_artist_name(track["artist_id"])
-        album_name = api.get_album_name(track["album_id"])
+        album_name  = api.get_album_name(track["album_id"])
         li = xbmcgui.ListItem(label=track["title"])
         info = {
-            "title": track["title"],
-            "artist": artist_name,
-            "album": album_name,
+            "title":       track["title"],
+            "artist":      artist_name,
+            "album":       album_name,
             "tracknumber": track["track_number"],
-            "duration": track["duration"],
-            "genre": track["genre"],
+            "duration":    track["duration"],
+            "genre":       track["genre"] or album_meta.get("genre", ""),
         }
         if track.get("year"):
             info["year"] = int(track["year"])
+        if album_meta.get("description"): info["comment"] = album_meta["description"]
         li.setInfo("music", info)
+
         art_url = api.get_artwork_url(track.get("artwork_id"))
-        if art_url:
-            li.setArt({"thumb": art_url, "icon": art_url})
+        art = {"thumb": art_url, "icon": art_url} if art_url else {}
+        if album_meta.get("discart"): art["discart"] = album_meta["discart"]
+        if album_meta.get("back"):    art["back"]    = album_meta["back"]
+        if album_meta.get("fanart") and not art_url: art["fanart"] = album_meta["fanart"]
+        if art:
+            li.setArt(art)
         li.setProperty("IsPlayable", "true")
         xbmcplugin.addDirectoryItem(
             HANDLE, build_url("play", track_id=track["id"]), li, False

@@ -42,5 +42,14 @@
         </setting>
       </group>
     </category>
+    <category id="metadata" label="32030" help="">
+      <group id="3">
+        <setting id="fanart_tv_api_key" type="string" label="32031" help="32032">
+          <level>0</level>
+          <default/>
+          <control type="edit" format="string"/>
+        </setting>
+      </group>
+    </category>
   </section>
 </settings>
