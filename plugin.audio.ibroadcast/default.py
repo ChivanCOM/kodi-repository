@@ -50,9 +50,9 @@ def _prefetch_metadata(api, force=False):
     """
     meta = _get_meta()
 
-    artist_names = [a["name"] for a in api.get_artists()]
-    artist_album_pairs = [
-        (api.get_artist_name(alb["artist_id"]), alb["name"])
+    artists = [(a["id"], a["name"]) for a in api.get_artists()]
+    albums  = [
+        (alb["id"], api.get_artist_name(alb["artist_id"]), alb["name"])
         for alb in api.get_albums()
         if api.get_artist_name(alb["artist_id"])
     ]
@@ -80,9 +80,9 @@ def _prefetch_metadata(api, force=False):
         pd.update(pct, f"Albums ({i + 1}/{total}): {name}")
 
     fetched_a, skipped_a = meta.prefetch_artists(
-        artist_names, on_progress=on_artist, is_cancelled=pd.iscanceled, force=force)
+        artists, on_progress=on_artist, is_cancelled=pd.iscanceled, force=force)
     fetched_al, skipped_al = meta.prefetch_albums(
-        artist_album_pairs, on_progress=on_album, is_cancelled=pd.iscanceled, force=force)
+        albums, on_progress=on_album, is_cancelled=pd.iscanceled, force=force)
 
     pd.close()
 
@@ -207,7 +207,7 @@ def list_artists():
         art  = {"thumb": ib_art, "icon": ib_art} if ib_art else {"icon": "DefaultArtist.png"}
         info = {"artist": artist["name"], "mediatype": "artist"}
 
-        cached = meta.get_artist_info_cached(artist["name"])
+        cached = meta.get_artist_info_cached(artist["id"])
         if cached:
             if cached.get("thumb") and not ib_art:
                 art["thumb"] = art["icon"] = cached["thumb"]
@@ -250,27 +250,22 @@ def list_albums(artist_id=None):
     albums = api.get_albums(artist_id=artist_id)
 
     # Pre-load single artist meta when filtering by artist; otherwise look up per album below
-    _fixed_artist_meta = {}
-    if artist_id:
-        artist_name_for_meta = api.get_artist_name(artist_id)
-        if artist_name_for_meta:
-            _fixed_artist_meta = meta.get_artist_info_cached(artist_name_for_meta) or {}
+    _fixed_artist_meta = meta.get_artist_info_cached(artist_id) if artist_id else {}
     _artist_meta_cache = {}  # dedup reads when browsing all albums
 
     xbmcplugin.setContent(HANDLE, "albums")
     for album in albums:
         artist_name = api.get_artist_name(album["artist_id"])
-        alb_meta    = meta.get_album_info_cached(artist_name, album["name"]) if artist_name else {}
+        alb_meta    = meta.get_album_info_cached(album["id"])
 
         # Per-album artist meta (needed in "all albums" view where artist changes per item)
         if artist_id:
             artist_meta = _fixed_artist_meta
-        elif artist_name:
-            if artist_name not in _artist_meta_cache:
-                _artist_meta_cache[artist_name] = meta.get_artist_info_cached(artist_name) or {}
-            artist_meta = _artist_meta_cache[artist_name]
         else:
-            artist_meta = {}
+            aid = album["artist_id"]
+            if aid not in _artist_meta_cache:
+                _artist_meta_cache[aid] = meta.get_artist_info_cached(aid)
+            artist_meta = _artist_meta_cache[aid]
 
         li = xbmcgui.ListItem(label=album["name"])
         info = {"album": album["name"], "artist": artist_name, "mediatype": "album"}
@@ -328,12 +323,13 @@ def list_tracks(album_id=None, artist_id=None, playlist_id=None):
 
     album_meta  = {}
     artist_meta = {}
-    if album_id and tracks:
-        alb_name   = api.get_album_name(album_id)
-        alb_artist = api.get_artist_name(tracks[0]["artist_id"])
-        if alb_name and alb_artist:
-            album_meta  = meta.get_album_info_cached(alb_artist, alb_name)
-            artist_meta = meta.get_artist_info_cached(alb_artist) or {}
+    if tracks:
+        if album_id:
+            album_meta  = meta.get_album_info_cached(album_id)
+        # artist_meta: from album's artist (album view) or the filtered artist (artist view)
+        ref_artist_id = tracks[0]["artist_id"] if album_id else (artist_id or None)
+        if ref_artist_id:
+            artist_meta = meta.get_artist_info_cached(ref_artist_id)
 
     xbmcplugin.setContent(HANDLE, "songs")
     for track in tracks:
@@ -365,11 +361,24 @@ def list_tracks(album_id=None, artist_id=None, playlist_id=None):
 
         art_url = api.get_artwork_url(track.get("artwork_id"))
         art = {"thumb": art_url, "icon": art_url} if art_url else {}
-        if art.get("thumb"):          art["poster"]    = art["thumb"]
-        if album_meta.get("discart"): art["discart"]   = album_meta["discart"]
-        if album_meta.get("back"):    art["back"]      = album_meta["back"]
-        if album_meta.get("fanart"):  art["fanart"]    = album_meta["fanart"]
-        if album_meta.get("fanart"):  art["landscape"] = album_meta["fanart"]
+        # Fallback thumb: TADB/FTV album cover when iBroadcast has no artwork for this track
+        if not art_url and album_meta.get("thumb"):
+            art["thumb"] = art["icon"] = album_meta["thumb"]
+        if art.get("thumb"):
+            art["poster"] = art["thumb"]
+        if album_meta.get("discart"):    art["discart"]   = album_meta["discart"]
+        if album_meta.get("back"):       art["back"]      = album_meta["back"]
+        # Fanart + landscape from artist meta (richer source); album_meta fanart is FTV artist bg too
+        fanart = artist_meta.get("fanart") or album_meta.get("fanart")
+        if fanart:                       art["fanart"]    = fanart
+        landscape = artist_meta.get("widethumb") or fanart
+        if landscape:                    art["landscape"] = landscape
+        if artist_meta.get("fanart2"):   art["fanart2"]   = artist_meta["fanart2"]
+        if artist_meta.get("fanart3"):   art["fanart3"]   = artist_meta["fanart3"]
+        if artist_meta.get("fanart4"):   art["fanart4"]   = artist_meta["fanart4"]
+        if artist_meta.get("clearlogo"): art["clearlogo"] = artist_meta["clearlogo"]
+        if artist_meta.get("clearart"):  art["clearart"]  = artist_meta["clearart"]
+        if artist_meta.get("banner"):    art["banner"]    = artist_meta["banner"]
         if art:
             li.setArt(art)
         li.setProperty("IsPlayable", "true")

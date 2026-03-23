@@ -15,7 +15,6 @@ the refresh-library action can warm the cache for all artists and albums.
 
 import json
 import os
-import hashlib
 import time
 import urllib.request
 import urllib.parse
@@ -29,7 +28,7 @@ except ImportError:
         print(f"[meta] {msg}")
 
 MB_BASE   = "https://musicbrainz.org/ws/2"
-MB_UA     = "iBroadcast-Kodi/1.2.18 (https://github.com/ChivanCOM/kodi-repository)"
+MB_UA     = "iBroadcast-Kodi/1.2.19 (https://github.com/ChivanCOM/kodi-repository)"
 TADB_BASE = "https://www.theaudiodb.com/api/v1/json/2"
 FTV_BASE  = "https://webservice.fanart.tv/v3/music"
 CACHE_TTL = 30 * 86400  # 30 days
@@ -43,9 +42,9 @@ class MetadataClient:
 
     # ── cache ───────────────────────────────────────────────────────────────
 
-    def _ck(self, *parts):
-        raw = "|".join(str(p).strip().lower() for p in parts)
-        return hashlib.md5(raw.encode()).hexdigest() + ".json"
+    def _ck(self, prefix, item_id):
+        """Cache filename keyed by iBroadcast integer ID — safe for any artist/album name."""
+        return f"{prefix}_{item_id}.json"
 
     def _load(self, k):
         path = os.path.join(self._dir, k)
@@ -164,17 +163,17 @@ class MetadataClient:
 
     # ── public: artist ──────────────────────────────────────────────────────
 
-    def get_artist_info(self, name, force=False):
+    def get_artist_info(self, artist_id, name, force=False):
         """Fetch and cache artist metadata.  Primary: TADB name-search.  Optional: FTV."""
         if not name:
             return {}
-        k = self._ck("ar", name)
+        k = self._ck("ar", artist_id)
         if not force:
             cached = self._load(k)
             if cached is not None:
                 return cached
 
-        _log(f"artist: {name}")
+        _log(f"artist {artist_id}: {name}")
         a = self._tadb_search_artist(name)
 
         if a:
@@ -211,25 +210,25 @@ class MetadataClient:
         self._save(k, d)
         return d
 
-    def get_artist_info_cached(self, name):
+    def get_artist_info_cached(self, artist_id):
         """Return cached artist info without any HTTP calls."""
-        if not name:
+        if not artist_id:
             return {}
-        return self._load(self._ck("ar", name)) or {}
+        return self._load(self._ck("ar", artist_id)) or {}
 
     # ── public: album ───────────────────────────────────────────────────────
 
-    def get_album_info(self, artist_name, album_name, force=False):
+    def get_album_info(self, album_id, artist_name, album_name, force=False):
         """Fetch and cache album metadata.  Primary: TADB name-search.  Optional: FTV."""
         if not artist_name or not album_name:
             return {}
-        k = self._ck("al", artist_name, album_name)
+        k = self._ck("al", album_id)
         if not force:
             cached = self._load(k)
             if cached is not None:
                 return cached
 
-        _log(f"album: {artist_name} / {album_name}")
+        _log(f"album {album_id}: {artist_name} / {album_name}")
         alb = self._tadb_search_album(artist_name, album_name)
 
         if alb:
@@ -279,17 +278,17 @@ class MetadataClient:
         self._save(k, d)
         return d
 
-    def get_album_info_cached(self, artist_name, album_name):
+    def get_album_info_cached(self, album_id):
         """Return cached album info without any HTTP calls."""
-        if not artist_name or not album_name:
+        if not album_id:
             return {}
-        return self._load(self._ck("al", artist_name, album_name)) or {}
+        return self._load(self._ck("al", album_id)) or {}
 
     # ── bulk prefetch ────────────────────────────────────────────────────────
 
-    def _needs_fetch(self, *ck_parts):
+    def _needs_fetch(self, prefix, item_id):
         """True when cache entry is absent, expired, or was cached without FTV but key is now set."""
-        d = self._load(self._ck(*ck_parts))
+        d = self._load(self._ck(prefix, item_id))
         if d is None:
             return True
         # Re-fetch if a FTV key is configured now but wasn't used when this entry was written
@@ -297,38 +296,38 @@ class MetadataClient:
             return True
         return False
 
-    def prefetch_artists(self, artist_names, on_progress=None, is_cancelled=None, force=False):
+    def prefetch_artists(self, artists, on_progress=None, is_cancelled=None, force=False):
         """
-        Pre-warm the cache for a list of artist names.
+        Pre-warm the cache for a list of (artist_id, name) tuples.
         force=False  — skip artists already in cache (subsequent refreshes are fast).
         force=True   — re-fetch every artist regardless of cache (full rebuild).
-        on_progress(fetched, total_to_fetch, name) — called only for items being fetched.
+        on_progress(i, total, name) — called only for items being fetched.
         is_cancelled() — return True to abort.
         Returns (fetched, skipped) counts.
         """
-        pending = artist_names if force else [n for n in artist_names if self._needs_fetch("ar", n)]
+        pending = artists if force else [(aid, n) for aid, n in artists if self._needs_fetch("ar", aid)]
         total   = len(pending)
-        for i, name in enumerate(pending):
+        for i, (artist_id, name) in enumerate(pending):
             if is_cancelled and is_cancelled():
                 break
             if on_progress:
                 on_progress(i, total, name)
-            self.get_artist_info(name, force=force)
-        return total, len(artist_names) - total
+            self.get_artist_info(artist_id, name, force=force)
+        return total, len(artists) - total
 
-    def prefetch_albums(self, artist_album_pairs, on_progress=None, is_cancelled=None, force=False):
+    def prefetch_albums(self, albums, on_progress=None, is_cancelled=None, force=False):
         """
-        Pre-warm the cache for a list of (artist_name, album_name) tuples.
+        Pre-warm the cache for a list of (album_id, artist_name, album_name) tuples.
         force=True re-fetches every album regardless of cache.
         Returns (fetched, skipped) counts.
         """
-        pending = (artist_album_pairs if force
-                   else [(ar, al) for ar, al in artist_album_pairs if self._needs_fetch("al", ar, al)])
+        pending = (albums if force
+                   else [(aid, ar, al) for aid, ar, al in albums if self._needs_fetch("al", aid)])
         total   = len(pending)
-        for i, (artist_name, album_name) in enumerate(pending):
+        for i, (album_id, artist_name, album_name) in enumerate(pending):
             if is_cancelled and is_cancelled():
                 break
             if on_progress:
                 on_progress(i, total, album_name)
-            self.get_album_info(artist_name, album_name, force=force)
-        return total, len(artist_album_pairs) - total
+            self.get_album_info(album_id, artist_name, album_name, force=force)
+        return total, len(albums) - total
