@@ -276,7 +276,7 @@ class MetadataClient:
         if a:
             d = {
                 "mbid":       a.get("strMusicBrainzID") or "",
-                "biography":  a.get("strBiographyEN") or "",
+                "biography":  a.get("strBiography") or "",
                 "genre":      a.get("strGenre") or "",
                 "style":      a.get("strStyle") or "",
                 "mood":       a.get("strMood") or "",
@@ -336,7 +336,7 @@ class MetadataClient:
 
         if alb:
             d = {
-                "description": alb.get("strDescriptionEN") or "",
+                "description": alb.get("strDescription") or "",
                 "genre":       alb.get("strGenre") or "",
                 "style":       alb.get("strStyle") or "",
                 "mood":        alb.get("strMood") or "",
