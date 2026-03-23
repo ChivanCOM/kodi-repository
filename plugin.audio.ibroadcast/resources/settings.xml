@@ -7,13 +7,23 @@
         <setting id="token" type="string" label="" help="">
           <level>9</level>
           <default/>
-          <control type="edit" format="string"/>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string">
+            <heading></heading>
+          </control>
           <visible>false</visible>
         </setting>
         <setting id="user_id" type="string" label="" help="">
           <level>9</level>
           <default/>
-          <control type="edit" format="string"/>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string">
+            <heading></heading>
+          </control>
           <visible>false</visible>
         </setting>
         <setting id="account" type="action" label="32001" help="">
@@ -28,6 +38,7 @@
     <category id="playback" label="32010" help="">
       <group id="2">
         <setting id="bitrate" type="string" label="32011" help="">
+          <level>0</level>
           <default>128</default>
           <constraints>
             <options>
@@ -47,7 +58,19 @@
         <setting id="fanart_tv_api_key" type="string" label="32031" help="32032">
           <level>0</level>
           <default/>
-          <control type="edit" format="string"/>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string">
+            <heading>32031</heading>
+          </control>
+        </setting>
+        <setting id="rebuild_metadata" type="action" label="32033" help="32034">
+          <level>0</level>
+          <data>RunPlugin(plugin://plugin.audio.ibroadcast/?mode=rebuild_metadata)</data>
+          <control type="button" format="action">
+            <close>false</close>
+          </control>
         </setting>
       </group>
     </category>

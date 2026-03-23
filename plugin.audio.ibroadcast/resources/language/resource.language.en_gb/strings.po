@@ -55,3 +55,11 @@ msgstr ""
 msgctxt "#32032"
 msgid "Optional. Get a free personal API key at fanart.tv to enable high-resolution artist and album artwork."
 msgstr ""
+
+msgctxt "#32033"
+msgid "Rebuild Metadata"
+msgstr ""
+
+msgctxt "#32034"
+msgid "Re-scrape metadata for all artists and albums from TheAudioDB and FanArt.tv, replacing all cached data."
+msgstr ""

@@ -227,15 +227,24 @@ class MetadataClient:
     # ── internal ────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _first(lst):
-        return lst[0]["url"] if lst else ""
+    def _ftv_sort(lst):
+        """Sort a FanArt.tv image list by likes descending (most popular first)."""
+        if not lst:
+            return lst
+        try:
+            return sorted(lst, key=lambda x: int(x.get("likes") or 0), reverse=True)
+        except (TypeError, ValueError):
+            return lst
+
+    def _first(self, lst):
+        return self._ftv_sort(lst)[0]["url"] if lst else ""
 
     def _apply_ftv_artist(self, ftv, d):
         """Overlay FanArt.tv artist images onto result dict d (higher quality)."""
         if not ftv:
             return
         if ftv.get("artistbackground"):
-            bg = ftv["artistbackground"]
+            bg = self._ftv_sort(ftv["artistbackground"])
             d["fanart"]    = bg[0]["url"] if len(bg) > 0 else d.get("fanart", "")
             d["widethumb"] = bg[0]["url"] if len(bg) > 0 else d.get("widethumb", "")
             d["fanart2"]   = bg[1]["url"] if len(bg) > 1 else ""
@@ -366,7 +375,7 @@ class MetadataClient:
                     if alb_art.get("albumcover"): d["thumb"]   = self._first(alb_art["albumcover"])
                     if alb_art.get("cdart"):      d["discart"] = self._first(alb_art["cdart"])
                     if ftv.get("artistbackground"):
-                        d["fanart"] = ftv["artistbackground"][0]["url"]
+                        d["fanart"] = self._first(ftv["artistbackground"])
 
         d["_ftv_checked"] = bool(self._ftv_key)
         self._save(k, d)

@@ -70,11 +70,14 @@ def _run_prefetch_bg(api, force):
             f"{sa + sal} skipped",
             xbmc.LOGINFO,
         )
-        xbmcgui.Dialog().notification(
-            "iBroadcast",
-            f"Metadata done: {fa} artists, {fal} albums",
-            xbmcgui.NOTIFICATION_INFO,
-            4000,
+        # xbmc.executebuiltin routes through Kodi's main event loop and is more
+        # reliable from background threads than xbmcgui.Dialog().notification().
+        # Commas delimit Notification() args so use '/' as separator.
+        xbmc.executebuiltin(
+            f"Notification(iBroadcast,"
+            f"Metadata complete: {fa} artists / {fal} albums,"
+            f"8000,"
+            f"{ADDON.getAddonInfo('path')}/icon.png)"
         )
 
 
@@ -176,8 +179,7 @@ def main_menu():
         ("Playlists",       build_url("playlists"), True),
         ("All Tracks",      build_url("tracks"),    True),
         ("Search",          build_url("search"),    True),
-        ("Refresh Library",   build_url("refresh"),          False),
-        ("Rebuild Metadata",  build_url("rebuild_metadata"),  False),
+        ("Refresh Library",   build_url("refresh"),  False),
     ]
     for label, url, is_folder in items:
         li = xbmcgui.ListItem(label=label)
