@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <addons>
-  <addon id="plugin.audio.ibroadcast" name="iBroadcast Music" version="1.2.14" provider-name="ChivanCOM">
+  <addon id="plugin.audio.ibroadcast" name="iBroadcast Music" version="1.2.15" provider-name="ChivanCOM">
     <requires>
       <import addon="xbmc.python" version="3.0.0" />
     </requires>
