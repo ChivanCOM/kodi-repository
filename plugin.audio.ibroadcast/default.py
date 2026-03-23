@@ -211,7 +211,9 @@ def list_artists():
         if cached:
             if cached.get("thumb") and not ib_art:
                 art["thumb"] = art["icon"] = cached["thumb"]
-            if art.get("thumb"):        art["poster"]    = art["thumb"]
+            # poster: prefer TADB/FTV portrait photo over iBroadcast thumb
+            art["poster"] = cached.get("thumb") or art.get("thumb") or ""
+            if not art["poster"]: del art["poster"]
             if cached.get("fanart"):    art["fanart"]    = cached["fanart"]
             if cached.get("fanart"):    art["landscape"] = cached["fanart"]
             if cached.get("fanart2"):   art["fanart2"]   = cached["fanart2"]
@@ -281,7 +283,9 @@ def list_albums(artist_id=None):
         art = {"thumb": art_url, "icon": art_url} if art_url else {}
         if not art_url and alb_meta.get("thumb"): art["thumb"] = art["icon"] = alb_meta["thumb"]
         if not art: art["icon"] = "DefaultAlbumCover.png"
-        if art.get("thumb"):             art["poster"]    = art["thumb"]
+        # poster: prefer TADB HQ album cover over iBroadcast thumb
+        poster = alb_meta.get("thumb") or art.get("thumb")
+        if poster: art["poster"] = poster
         if alb_meta.get("discart"):      art["discart"]   = alb_meta["discart"]
         if alb_meta.get("back"):         art["back"]      = alb_meta["back"]
         if artist_meta.get("fanart"):    art["fanart"]    = artist_meta["fanart"]
