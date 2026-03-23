@@ -230,6 +230,12 @@ def list_artists():
             if cached.get("mood"):       li.setProperty("Artist_Mood",         cached["mood"])
             if cached.get("born_year"):  li.setProperty("Artist_Born",         str(cached["born_year"]))
             if cached.get("country"):    li.setProperty("Artist_Country",      cached["country"])
+        li.addContextMenuItems([
+            (ADDON.getLocalizedString(32037),
+             f"RunPlugin({build_url('fetch_meta_artist', artist_id=artist['id'])})"),
+            (ADDON.getLocalizedString(32038),
+             f"RunPlugin({build_url('fetch_meta_artist', artist_id=artist['id'], custom=1)})"),
+        ])
         xbmcplugin.addDirectoryItem(HANDLE, build_url("artist_albums", artist_id=artist["id"]), li, True)
 
     xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_LABEL_IGNORE_THE)
@@ -299,6 +305,12 @@ def list_albums(artist_id=None):
         if alb_meta.get("mood"):        li.setProperty("Album_Mood",         alb_meta["mood"])
         if alb_meta.get("theme"):       li.setProperty("Album_Theme",        alb_meta["theme"])
         if alb_meta.get("rating"):      li.setProperty("Album_Rating",       str(alb_meta["rating"]))
+        li.addContextMenuItems([
+            (ADDON.getLocalizedString(32037),
+             f"RunPlugin({build_url('fetch_meta_album', album_id=album['id'])})"),
+            (ADDON.getLocalizedString(32038),
+             f"RunPlugin({build_url('fetch_meta_album', album_id=album['id'], custom=1)})"),
+        ])
         xbmcplugin.addDirectoryItem(
             HANDLE, build_url("album_tracks", album_id=album["id"]), li, True
         )
@@ -543,6 +555,181 @@ def rebuild_metadata():
     _prefetch_metadata(api, force=True)
 
 
+def _kb(default, heading):
+    """Show Kodi keyboard and return stripped text, or None if cancelled."""
+    kb = xbmc.Keyboard(default, heading)
+    kb.doModal()
+    return kb.getText().strip() if kb.isConfirmed() else None
+
+
+def _meta_result_dialog(title, d, artist_fields, album_fields=None):
+    """Show a Dialog.ok() summarising which art/info fields were found vs missing."""
+    fields = artist_fields if album_fields is None else album_fields
+    found   = [label for key, label in fields if d.get(key)]
+    missing = [label for key, label in fields if not d.get(key)]
+    lines = []
+    if found:
+        lines.append(f"Found:   {' · '.join(found)}")
+    if missing:
+        lines.append(f"Missing: {' · '.join(missing)}")
+    if not lines:
+        lines = ["No metadata found on any provider."]
+    xbmcgui.Dialog().ok(f"iBroadcast — {title}", "\n".join(lines))
+
+
+_ARTIST_FIELDS = [
+    ("thumb",      "Thumb"),
+    ("fanart",     "Fanart"),
+    ("widethumb",  "Landscape"),
+    ("clearlogo",  "Logo"),
+    ("clearart",   "Clearart"),
+    ("banner",     "Banner"),
+    ("biography",  "Bio"),
+    ("genre",      "Genre"),
+]
+_ALBUM_FIELDS = [
+    ("thumb",       "Cover"),
+    ("discart",     "Discart"),
+    ("back",        "Back"),
+    ("fanart",      "Fanart"),
+    ("description", "Description"),
+    ("genre",       "Genre"),
+]
+
+
+def fetch_meta_artist():
+    """Force-refresh metadata for a single artist.
+    custom=1 → show keyboard pre-filled with stored name so user can correct it.
+    """
+    params    = dict(urllib.parse.parse_qsl(sys.argv[2].lstrip("?")))
+    artist_id = params.get("artist_id")
+    if not artist_id:
+        return
+    api = get_api(require_library=True)
+    if not api:
+        return
+    stored_name = api.get_artist_name(artist_id)
+
+    if params.get("custom") == "1":
+        name = _kb(stored_name, "Search artist as…")
+        if not name:
+            return
+    else:
+        name = stored_name
+
+    meta = _get_meta()
+    d = meta.get_artist_info(int(artist_id), name, force=True)
+    _meta_result_dialog(name or str(artist_id), d, _ARTIST_FIELDS)
+
+
+def fetch_meta_album():
+    """Force-refresh metadata for a single album.
+    custom=1 → show keyboards pre-filled with stored names so user can correct them.
+    """
+    params   = dict(urllib.parse.parse_qsl(sys.argv[2].lstrip("?")))
+    album_id = params.get("album_id")
+    if not album_id:
+        return
+    api = get_api(require_library=True)
+    if not api:
+        return
+    albums = api.get_albums()
+    alb = next((a for a in albums if str(a["id"]) == str(album_id)), None)
+    if not alb:
+        return
+    stored_artist = api.get_artist_name(alb["artist_id"])
+    stored_album  = alb["name"]
+
+    if params.get("custom") == "1":
+        artist_name = _kb(stored_artist, "Search artist as…")
+        if not artist_name:
+            return
+        album_name = _kb(stored_album, "Search album as…")
+        if not album_name:
+            return
+    else:
+        artist_name = stored_artist
+        album_name  = stored_album
+
+    meta = _get_meta()
+    d = meta.get_album_info(int(album_id), artist_name, album_name, force=True)
+    _meta_result_dialog(album_name or str(album_id), d, None, _ALBUM_FIELDS)
+
+
+def metadata_stats():
+    """Show an artwork coverage table built from local cache files — no network calls."""
+    api = get_api(require_library=True)
+    if not api:
+        return
+
+    meta     = _get_meta()
+    artists  = api.get_artists()   # album artists only
+    albums   = api.get_albums()
+
+    # ── artist counters ───────────────────────────────────────────────────
+    ar_total = len(artists)
+    ar_cached = ar_thumb = ar_landscape = ar_fanart = ar_logo = 0
+    ar_clearart = ar_banner = ar_bio = 0
+
+    for a in artists:
+        d = meta.get_artist_info_cached(a["id"])
+        if not d:
+            continue
+        ar_cached   += 1
+        if d.get("thumb"):                          ar_thumb     += 1
+        if d.get("widethumb") or d.get("fanart"):   ar_landscape += 1
+        if d.get("fanart"):                         ar_fanart    += 1
+        if d.get("clearlogo"):                      ar_logo      += 1
+        if d.get("clearart"):                       ar_clearart  += 1
+        if d.get("banner"):                         ar_banner    += 1
+        if d.get("biography"):                      ar_bio       += 1
+
+    # ── album counters ────────────────────────────────────────────────────
+    al_total = len(albums)
+    al_cached = al_thumb = al_discart = al_back = al_fanart = al_desc = 0
+
+    for a in albums:
+        d = meta.get_album_info_cached(a["id"])
+        if not d:
+            continue
+        al_cached   += 1
+        if d.get("thumb"):        al_thumb   += 1
+        if d.get("discart"):      al_discart += 1
+        if d.get("back"):         al_back    += 1
+        if d.get("fanart"):       al_fanart  += 1
+        if d.get("description"):  al_desc    += 1
+
+    # ── format ───────────────────────────────────────────────────────────
+    def pct(n, total):
+        return f"{round(n * 100 / total)}%" if total else "—"
+
+    def row(label, n, total):
+        return f"  {label:<13} {n:>4} / {total:<4}  ({pct(n, total):>4})"
+
+    lines = [
+        f"ARTISTS — {ar_cached} cached of {ar_total} total",
+        row("Thumb",      ar_thumb,     ar_total),
+        row("Landscape",  ar_landscape, ar_total),
+        row("Fanart",     ar_fanart,    ar_total),
+        row("Clearlogo",  ar_logo,      ar_total),
+        row("Clearart",   ar_clearart,  ar_total),
+        row("Banner",     ar_banner,    ar_total),
+        row("Biography",  ar_bio,       ar_total),
+        "",
+        f"ALBUMS — {al_cached} cached of {al_total} total",
+        row("Cover",        al_thumb,   al_total),
+        row("Discart",      al_discart, al_total),
+        row("Back cover",   al_back,    al_total),
+        row("Fanart",       al_fanart,  al_total),
+        row("Description",  al_desc,    al_total),
+    ]
+
+    xbmcgui.Dialog().textviewer(
+        "iBroadcast — Metadata Statistics",
+        "\n".join(lines),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
@@ -577,6 +764,12 @@ def router():
         refresh_library()
     elif mode == "rebuild_metadata":
         rebuild_metadata()
+    elif mode == "metadata_stats":
+        metadata_stats()
+    elif mode == "fetch_meta_artist":
+        fetch_meta_artist()
+    elif mode == "fetch_meta_album":
+        fetch_meta_album()
     else:
         main_menu()
 

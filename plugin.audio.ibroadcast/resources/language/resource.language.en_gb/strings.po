@@ -63,3 +63,19 @@ msgstr ""
 msgctxt "#32034"
 msgid "Re-scrape metadata for all artists and albums from TheAudioDB and FanArt.tv, replacing all cached data."
 msgstr ""
+
+msgctxt "#32035"
+msgid "Metadata Statistics"
+msgstr ""
+
+msgctxt "#32036"
+msgid "Show artwork coverage — how many artists and albums have each art type cached."
+msgstr ""
+
+msgctxt "#32037"
+msgid "Fetch Metadata"
+msgstr ""
+
+msgctxt "#32038"
+msgid "Search Metadata..."
+msgstr ""

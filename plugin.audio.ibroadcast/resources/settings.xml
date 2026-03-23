@@ -72,6 +72,13 @@
             <close>false</close>
           </control>
         </setting>
+        <setting id="metadata_stats" type="action" label="32035" help="32036">
+          <level>0</level>
+          <data>RunPlugin(plugin://plugin.audio.ibroadcast/?mode=metadata_stats)</data>
+          <control type="button" format="action">
+            <close>false</close>
+          </control>
+        </setting>
       </group>
     </category>
   </section>
