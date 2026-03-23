@@ -29,18 +29,9 @@
 #include <cmath>
 #include <algorithm>
 
-// ── GLES 2.0 compatibility: define 16-bit float constants if missing ──────────
-// GL_RGBA16F / GL_HALF_FLOAT are GLES 3.0 tokens; GLES 2.0 headers expose them
-// only via extensions (gl2ext.h).  Provide the numeric literals as fallbacks so
-// the code compiles against GLES 2.0 headers.  Values are from the OpenGL ES
-// specification and are identical across all versions.
-// GL_HALF_FLOAT_OES (0x8D61) is the correct type token for glTexImage2D on
-// GLES 2.0; GL_HALF_FLOAT (0x140B) is its GLES 3.0 / desktop counterpart.
+// Desktop only: 16-bit float FBO for banding-free gradients
 #ifndef GL_RGBA16F
 #  define GL_RGBA16F 0x881A
-#endif
-#ifndef GL_HALF_FLOAT_OES
-#  define GL_HALF_FLOAT_OES 0x8D61
 #endif
 
 // ── Shared vertex shader ─────────────────────────────────────────────────────
@@ -1372,16 +1363,13 @@ private:
     {
       glGenTextures(1, texs[i]);
       glBindTexture(GL_TEXTURE_2D, *texs[i]);
-      // Prefer 16-bit float for banding-free gradients; fall back to 8-bit if
-      // the driver rejects the format (e.g. GLES 2.0 without float-buffer ext).
-      glGetError();
 #if defined(HAS_GLES)
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_fboW, m_fboH, 0, GL_RGBA, GL_HALF_FLOAT_OES, nullptr);
+      // GLES: plain 8-bit — reliable on all Android drivers
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_fboW, m_fboH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 #else
+      // Desktop: 16-bit float for banding-free gradients
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_fboW, m_fboH, 0, GL_RGBA, GL_FLOAT, nullptr);
 #endif
-      if (glGetError() != GL_NO_ERROR)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_fboW, m_fboH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
