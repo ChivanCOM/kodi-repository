@@ -29,12 +29,9 @@
 #include <cmath>
 #include <algorithm>
 
-// 16-bit float FBO constants — GLES 2.0 headers may not define these
+// Desktop only: 16-bit float FBO for banding-free gradients
 #ifndef GL_RGBA16F
 #  define GL_RGBA16F 0x881A
-#endif
-#ifndef GL_HALF_FLOAT_OES
-#  define GL_HALF_FLOAT_OES 0x8D61
 #endif
 
 // ── Shared vertex shader ─────────────────────────────────────────────────────
@@ -65,14 +62,7 @@ static const char* FRAG_SRC =
   "uniform   sampler2D u_tex;\n"
   "uniform   float     u_alpha;\n"
   "void main() {\n"
-  "  vec4 col = texture2D(u_tex, v_uv) * vec4(1.0, 1.0, 1.0, u_alpha);\n"
-  "#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
-  "  highp vec3 rnd = fract(sin(vec3(dot(v_uv,vec2(127.1,311.7)),\n"
-  "                               dot(v_uv,vec2(269.5,183.3)),\n"
-  "                               dot(v_uv,vec2(419.2,371.9)))*43758.5453));\n"
-  "  col.rgb += (rnd - 0.5) / 255.0;\n"
-  "#endif\n"
-  "  gl_FragColor = col;\n"
+  "  gl_FragColor = texture2D(u_tex, v_uv) * vec4(1.0, 1.0, 1.0, u_alpha);\n"
   "}\n";
 #else
   "#version 150\n"
@@ -121,14 +111,7 @@ static const char* BLUR_FRAG_SRC =
   "         + texture2D(u_tex, v_uv         ) * 0.375\n"
   "         + texture2D(u_tex, v_uv + d     ) * 0.25\n"
   "         + texture2D(u_tex, v_uv + d*2.0 ) * 0.0625;\n"
-  "  vec3 dith = vec3(0.0);\n"
-  "#ifdef GL_FRAGMENT_PRECISION_HIGH\n"
-  "  highp vec3 rnd = fract(sin(vec3(dot(v_uv,vec2(127.1,311.7)),\n"
-  "                               dot(v_uv,vec2(269.5,183.3)),\n"
-  "                               dot(v_uv,vec2(419.2,371.9)))*43758.5453));\n"
-  "  dith = (rnd - 0.5) / 255.0;\n"
-  "#endif\n"
-  "  gl_FragColor = vec4(c.rgb*0.65+dith, 1.0);\n"
+  "  gl_FragColor = vec4(c.rgb * 0.65, 1.0);\n"
   "}\n";
 #else
   "#version 150\n"
@@ -1367,16 +1350,15 @@ private:
     {
       glGenTextures(1, texs[i]);
       glBindTexture(GL_TEXTURE_2D, *texs[i]);
-      // Prefer 16-bit float for banding-free gradients; fall back to 8-bit if
-      // the driver rejects the format (e.g. GLES 2.0 without OES_texture_half_float).
-      glGetError();
 #if defined(HAS_GLES)
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_fboW, m_fboH, 0, GL_RGBA, GL_HALF_FLOAT_OES, nullptr);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_fboW, m_fboH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 #else
+      // Desktop: 16-bit float for banding-free gradients; fall back to 8-bit if unsupported
+      glGetError();
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, m_fboW, m_fboH, 0, GL_RGBA, GL_FLOAT, nullptr);
-#endif
       if (glGetError() != GL_NO_ERROR)
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_fboW, m_fboH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+#endif
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
