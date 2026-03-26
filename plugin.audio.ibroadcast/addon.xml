@@ -14,7 +14,11 @@
       <icon>icon.png</icon>
     </assets>
     <summary lang="en_GB">Play your iBroadcast music library</summary>
-    <description lang="en_GB">Browse and play music from your iBroadcast cloud music locker. Supports browsing by artist, album, and playlist, plus search.</description>
+    <description lang="en_GB">iBroadcast player for Kodi 21+, allowing you to stream your full music library from the cloud directly within Kodi. Browse your collection with enriched artist info, fanart, and album metadata for a more immersive experience.
+
+Features: full iBroadcast library access including playlists; adjustable quality up to original (subscription required); artist and album info via MusicBrainz, TheAudioDB, Discogs, and iBroadcast; smooth gapless playback; Up Next queue support; library refresh and search by song, album, or artist.
+
+Note: metadata may take a few minutes to load, and occasional crashes can occur when changing songs. For support, visit github.com/ChivanCOM/kodi-repository/issues. This add-on does not host media or metadata; all data is provided by external services and stored locally.</description>
     <platform>all</platform>
   </extension>
 </addon>
