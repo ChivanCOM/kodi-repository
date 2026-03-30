@@ -297,7 +297,12 @@ def list_albums(artist_id=None):
         if album.get("rating"):
             info["rating"] = float(album["rating"])
         if album.get("uploaded_on"):
-            info["dateadded"] = str(album["uploaded_on"])
+            # SORT_METHOD_DATE expects "DD.MM.YYYY" in the 'date' info label
+            try:
+                parts = str(album["uploaded_on"]).split(" ")[0].split("-")
+                info["date"] = f"{parts[2]}.{parts[1]}.{parts[0]}"
+            except (IndexError, ValueError):
+                pass
         genre = alb_meta.get("genre") or artist_meta.get("genre") or ""
         if genre:                   info["genre"]   = genre
         if alb_meta.get("description"):   info["comment"]                  = alb_meta["description"]
@@ -343,7 +348,7 @@ def list_albums(artist_id=None):
 
     xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_ALBUM_IGNORE_THE)
     xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_LABEL_IGNORE_THE)
-    xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_DATEADDED)
+    xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_DATE)
     xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_SONG_RATING)
     xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_PLAYCOUNT)
     end_directory("albums")
@@ -394,7 +399,11 @@ def list_tracks(album_id=None, artist_id=None, playlist_id=None):
         if track.get("rating"):
             info["rating"] = float(track["rating"])
         if track.get("uploaded_on"):
-            info["dateadded"] = str(track["uploaded_on"])
+            try:
+                parts = str(track["uploaded_on"]).split(" ")[0].split("-")
+                info["date"] = f"{parts[2]}.{parts[1]}.{parts[0]}"
+            except (IndexError, ValueError):
+                pass
         if album_meta.get("description"):  info["comment"]                 = album_meta["description"]
         if album_meta.get("rating"):       info["rating"]                  = float(album_meta["rating"])
         if album_meta.get("mbid"):            info["musicbrainzalbumid"]        = album_meta["mbid"]
@@ -443,7 +452,7 @@ def list_tracks(album_id=None, artist_id=None, playlist_id=None):
 
     xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_TRACKNUM)
     xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_LABEL_IGNORE_THE)
-    xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_DATEADDED)
+    xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_DATE)
     xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_SONG_RATING)
     xbmcplugin.addSortMethod(HANDLE, xbmcplugin.SORT_METHOD_PLAYCOUNT)
     end_directory("songs")

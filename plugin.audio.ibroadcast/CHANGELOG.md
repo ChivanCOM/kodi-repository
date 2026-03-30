@@ -1,10 +1,14 @@
 # Changelog
 
+## 1.3.2
+
+### Fixed
+- Date Added sorting now actually works — `SORT_METHOD_DATEADDED` is not supported for music content in Kodi; switched to `SORT_METHOD_DATE` with the `date` info label in DD.MM.YYYY format
+
 ## 1.3.1
 
 ### Fixed
-- Date Added sorting now works correctly for albums and tracks
-- Combines `uploaded_on` (date) and `uploaded_time` (time) into Kodi's expected format
+- Combines `uploaded_on` (date) and `uploaded_time` (time) from iBroadcast API
 - Albums derive their date from the earliest track since the iBroadcast API does not include upload dates on albums
 
 ## 1.3.0
