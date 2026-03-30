@@ -223,8 +223,8 @@ class IBroadcastAPI:
             if aid is not None:
                 if aid not in track_artwork and trk.get("artwork_id"):
                     track_artwork[aid] = trk["artwork_id"]
-                uon = trk.get("uploaded_on", "")
-                if uon and (aid not in track_uploaded or str(uon) < str(track_uploaded[aid])):
+                uon = f"{trk.get('uploaded_on', '')} {trk.get('uploaded_time', '')}".strip()
+                if uon and (aid not in track_uploaded or uon < track_uploaded[aid]):
                     track_uploaded[aid] = uon
                 track_plays[aid] = track_plays.get(aid, 0) + int(trk.get("plays") or 0)
 
@@ -240,7 +240,7 @@ class IBroadcastAPI:
                 "artwork_id": artwork_id,
                 "rating":     alb.get("rating", 0),
                 "plays":      track_plays.get(alb_id, 0),
-                "uploaded_on": alb.get("uploaded_on") or track_uploaded.get(alb_id, ""),
+                "uploaded_on": track_uploaded.get(alb_id, ""),
             })
         if artist_id:
             results = [a for a in results if str(a["artist_id"]) == str(artist_id)]
@@ -303,7 +303,7 @@ class IBroadcastAPI:
                 "file":            trk.get("file"),
                 "rating":          trk.get("rating", 0),
                 "plays":           trk.get("plays", 0),
-                "uploaded_on":     trk.get("uploaded_on", ""),
+                "uploaded_on":     f"{trk.get('uploaded_on', '')} {trk.get('uploaded_time', '')}".strip(),
             })
         return sorted(results, key=lambda x: (x["track_number"], x["title"].casefold()))
 

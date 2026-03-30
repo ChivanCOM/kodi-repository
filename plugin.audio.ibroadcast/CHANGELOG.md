@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.1
+
+### Fixed
+- Date Added sorting now works correctly for albums and tracks
+- Combines `uploaded_on` (date) and `uploaded_time` (time) into Kodi's expected format
+- Albums derive their date from the earliest track since the iBroadcast API does not include upload dates on albums
+
 ## 1.3.0
 
 ### Added
