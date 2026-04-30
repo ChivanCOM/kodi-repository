@@ -49,8 +49,11 @@ def request_device_code():
 
     Returns the server response dict with keys: device_code, user_code,
     verification_uri, verification_uri_complete, interval, expires_in.
+
+    iBroadcast's /device/code expects GET with query params (verified
+    empirically); POST form-encoded — what RFC 8628 mandates — returns 404.
     """
-    status, data = _post_form("/device/code", {
+    status, data = _request("GET", "/device/code", {
         "client_id": CLIENT_ID,
         "scope":     SCOPES,
     })
@@ -71,7 +74,7 @@ def exchange_device_code(device_code):
       EXCHANGE_SLOW_DOWN → payload is None; keep polling, raise interval
       EXCHANGE_ERROR     → payload is a human-readable error string
     """
-    status, data = _post_form("/token", {
+    status, data = _request("POST", "/token", {
         "grant_type":  "device_code",
         "client_id":   CLIENT_ID,
         "device_code": device_code,
@@ -89,7 +92,7 @@ def exchange_device_code(device_code):
 
 def refresh(refresh_token):
     """Exchange a refresh_token for fresh tokens. Returns finalized token dict."""
-    status, data = _post_form("/token", {
+    status, data = _request("POST", "/token", {
         "grant_type":    "refresh_token",
         "client_id":     CLIENT_ID,
         "refresh_token": refresh_token,
@@ -102,7 +105,7 @@ def refresh(refresh_token):
 def revoke(refresh_token):
     """Best-effort token revoke. Returns True on success."""
     try:
-        status, _ = _post_form("/revoke", {
+        status, _ = _request("POST", "/revoke", {
             "client_id":     CLIENT_ID,
             "refresh_token": refresh_token,
         })
@@ -125,17 +128,28 @@ def is_expired(expires_at, skew=120):
 # Internal
 # ----------------------------------------------------------------------
 
-def _post_form(path, form):
-    body = urllib.parse.urlencode(form).encode("utf-8")
-    req = urllib.request.Request(
-        OAUTH_BASE + path,
-        data=body,
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept":       "application/json",
-            "User-Agent":   "Kodi-iBroadcast/1.4",
-        },
-    )
+def _request(method, path, form):
+    """HTTP helper for the OAuth endpoints.
+
+    GET  → form goes in the query string, no body.
+    POST → form goes in an x-www-form-urlencoded body.
+    Returns (status_code, parsed_json_dict). Raises OAuthError only on network
+    failure; HTTP errors come back with their status so callers can branch
+    on OAuth error codes.
+    """
+    headers = {
+        "Accept":     "application/json",
+        "User-Agent": "Kodi-iBroadcast/1.4",
+    }
+    if method == "GET":
+        url  = OAUTH_BASE + path + "?" + urllib.parse.urlencode(form)
+        body = None
+    else:
+        url  = OAUTH_BASE + path
+        body = urllib.parse.urlencode(form).encode("utf-8")
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+    req = urllib.request.Request(url, data=body, method=method, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return resp.status, _safe_json(resp.read())
