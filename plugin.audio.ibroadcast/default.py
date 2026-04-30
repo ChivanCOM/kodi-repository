@@ -191,16 +191,14 @@ def _device_code_login():
     # Plain [B] only — named [COLOR] tags like 'cyan' depend on the active
     # skin's colors.xml and silently strip their contents on skins that
     # don't define them, which would hide the user code.
-    progress.create(
-        "iBroadcast — Sign in",
-        (
-            f"On any phone or computer, open:\n"
-            f"[B]{verify_uri}[/B]\n\n"
-            f"and enter this code:\n"
-            f"[B]{user_code}[/B]\n\n"
-            f"Waiting for authorization…"
-        ),
+    message = (
+        f"On any phone or computer, open:\n"
+        f"[B]{verify_uri}[/B]\n\n"
+        f"and enter this code:\n"
+        f"[B]{user_code}[/B]\n\n"
+        f"Waiting for authorization…"
     )
+    progress.create("iBroadcast — Sign in", message)
     monitor = xbmc.Monitor()
 
     try:
@@ -219,7 +217,9 @@ def _device_code_login():
                     "The sign-in code expired. Please try again."
                 )
                 return None
-            progress.update(min(int(elapsed / expires_in * 100), 99))
+            # Re-pass the full message: DialogProgress.update(percent) with no
+            # message argument resets the displayed text to empty.
+            progress.update(min(int(elapsed / expires_in * 100), 99), message)
 
             try:
                 code, payload = ibroadcast_oauth.exchange_device_code(dc["device_code"])
