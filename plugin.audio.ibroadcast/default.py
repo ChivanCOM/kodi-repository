@@ -188,13 +188,16 @@ def _device_code_login():
     started     = time.time()
 
     progress = xbmcgui.DialogProgress()
+    # Plain [B] only — named [COLOR] tags like 'cyan' depend on the active
+    # skin's colors.xml and silently strip their contents on skins that
+    # don't define them, which would hide the user code.
     progress.create(
         "iBroadcast — Sign in",
         (
             f"On any phone or computer, open:\n"
             f"[B]{verify_uri}[/B]\n\n"
             f"and enter this code:\n"
-            f"[B][COLOR cyan]{user_code}[/COLOR][/B]\n\n"
+            f"[B]{user_code}[/B]\n\n"
             f"Waiting for authorization…"
         ),
     )
