@@ -188,17 +188,14 @@ def _device_code_login():
     started     = time.time()
 
     progress = xbmcgui.DialogProgress()
-    # Plain [B] only — named [COLOR] tags like 'cyan' depend on the active
-    # skin's colors.xml and silently strip their contents on skins that
-    # don't define them, which would hide the user code.
-    message = (
-        f"On any phone or computer, open:\n"
-        f"[B]{verify_uri}[/B]\n\n"
-        f"and enter this code:\n"
-        f"[B]{user_code}[/B]\n\n"
-        f"Waiting for authorization…"
-    )
-    progress.create("iBroadcast — Sign in", message)
+    # Put the user_code in the dialog HEADING, not the message body. The
+    # heading is set once at create() and update() cannot overwrite it.
+    # Body text is plain (no BBCode, no newlines) for maximum skin
+    # compatibility — multi-line messages with [B] tags were rendering as
+    # only the static labels in some skins, hiding the code itself.
+    heading = f"iBroadcast — Sign-in code: {user_code}"
+    message = f"On any phone or computer, open {verify_uri} to authorize. Waiting…"
+    progress.create(heading, message)
     monitor = xbmc.Monitor()
 
     try:
