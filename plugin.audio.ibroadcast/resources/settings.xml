@@ -3,8 +3,30 @@
   <section id="plugin.audio.ibroadcast">
     <category id="account" label="32000" help="">
       <group id="1">
-        <!-- credentials stored by the plugin; never shown to the user -->
-        <setting id="token" type="string" label="" help="">
+        <!-- OAuth 2.0 credentials stored by the plugin; never shown to the user -->
+        <setting id="access_token" type="string" label="" help="">
+          <level>9</level>
+          <default/>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string">
+            <heading></heading>
+          </control>
+          <visible>false</visible>
+        </setting>
+        <setting id="refresh_token" type="string" label="" help="">
+          <level>9</level>
+          <default/>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string">
+            <heading></heading>
+          </control>
+          <visible>false</visible>
+        </setting>
+        <setting id="token_expires_at" type="string" label="" help="">
           <level>9</level>
           <default/>
           <constraints>
@@ -16,6 +38,19 @@
           <visible>false</visible>
         </setting>
         <setting id="user_id" type="string" label="" help="">
+          <level>9</level>
+          <default/>
+          <constraints>
+            <allowempty>true</allowempty>
+          </constraints>
+          <control type="edit" format="string">
+            <heading></heading>
+          </control>
+          <visible>false</visible>
+        </setting>
+        <!-- Legacy email/password token; kept in schema only so the
+             OAuth migration path can detect and clear it. -->
+        <setting id="token" type="string" label="" help="">
           <level>9</level>
           <default/>
           <constraints>

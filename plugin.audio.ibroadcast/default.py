@@ -6,6 +6,7 @@ Entry point and URL router.
 import sys
 import os
 import threading
+import time
 import urllib.parse
 
 import xbmc
@@ -29,7 +30,8 @@ def get_bitrate():
     return ADDON.getSetting("bitrate") or "128"
 
 sys.path.insert(0, os.path.join(ADDON.getAddonInfo("path"), "lib"))
-from ibroadcast import IBroadcastAPI, IBroadcastError
+from ibroadcast import IBroadcastAPI, IBroadcastError, IBroadcastAuthError
+import ibroadcast_oauth
 from metadata import MetadataClient
 
 
@@ -119,63 +121,167 @@ def build_url(mode, **kwargs):
     return BASE_URL + "?" + urllib.parse.urlencode(params)
 
 
-def _get_saved_api():
-    """Return an API instance loaded with credentials from Kodi settings, or None."""
-    token   = ADDON.getSetting("token")
-    user_id = ADDON.getSetting("user_id")
-    api = IBroadcastAPI(PROFILE_PATH, token=token, user_id=user_id)
-    return api if api.is_authenticated() else None
-
-
 def _save_credentials(api):
-    ADDON.setSetting("token",   api.token)
-    ADDON.setSetting("user_id", str(api.user_id))
+    """Persist OAuth tokens + user_id to addon settings.
+    Used both as the initial save after login and as the on-refresh callback."""
+    ADDON.setSetting("access_token",     api.access_token or "")
+    ADDON.setSetting("refresh_token",    api.refresh_token or "")
+    ADDON.setSetting("token_expires_at", str(api.expires_at or 0))
+    ADDON.setSetting("user_id",          str(api.user_id) if api.user_id else "")
+    # Best-effort cleanup of legacy email/password token field.
+    if ADDON.getSetting("token"):
+        ADDON.setSetting("token", "")
 
 
 def _clear_credentials():
-    ADDON.setSetting("token",   "")
-    ADDON.setSetting("user_id", "")
+    """Revoke the refresh token server-side (best effort) then wipe local state."""
+    rt = ADDON.getSetting("refresh_token")
+    if rt:
+        try:
+            ibroadcast_oauth.revoke(rt)
+        except Exception:
+            pass
+    ADDON.setSetting("access_token",     "")
+    ADDON.setSetting("refresh_token",    "")
+    ADDON.setSetting("token_expires_at", "")
+    ADDON.setSetting("user_id",          "")
+    ADDON.setSetting("token",            "")
 
 
-def _keyboard_login():
-    """Prompt for email and password via keyboard and attempt login. Returns the API on success."""
-    kb = xbmc.Keyboard("", "iBroadcast — Email Address")
-    kb.doModal()
-    if not kb.isConfirmed():
+def _get_saved_api():
+    """Return an API instance loaded with stored OAuth credentials, or None."""
+    access_token = ADDON.getSetting("access_token")
+    if not access_token:
         return None
-    email = kb.getText().strip()
-    if not email:
+    api = IBroadcastAPI(
+        PROFILE_PATH,
+        access_token=access_token,
+        refresh_token=ADDON.getSetting("refresh_token") or None,
+        expires_at=ADDON.getSetting("token_expires_at") or 0,
+        user_id=ADDON.getSetting("user_id") or None,
+        on_token_refreshed=_save_credentials,
+    )
+    return api if api.is_authenticated() else None
+
+
+def _has_legacy_credentials():
+    """True if the user has a stored email/password-era token but no OAuth token."""
+    return bool(ADDON.getSetting("token")) and not ADDON.getSetting("access_token")
+
+
+def _device_code_login():
+    """Run the OAuth 2.0 device-code flow and return an authenticated API on success.
+
+    Shows a Kodi progress dialog with the user_code and verification URL while
+    polling the OAuth /token endpoint at the server-supplied interval.
+    """
+    try:
+        dc = ibroadcast_oauth.request_device_code()
+    except ibroadcast_oauth.OAuthError as e:
+        xbmcgui.Dialog().ok("iBroadcast", f"Could not start sign-in:\n{e}")
         return None
 
-    kb = xbmc.Keyboard("", "iBroadcast — Password")
-    kb.setHiddenInput(True)
-    kb.doModal()
-    if not kb.isConfirmed():
-        return None
-    password = kb.getText()
-    if not password:
-        return None
+    user_code   = dc["user_code"]
+    verify_uri  = dc["verification_uri"]
+    interval    = max(int(dc.get("interval") or 5), 1)
+    expires_in  = int(dc.get("expires_in") or 600)
+    started     = time.time()
 
-    api = IBroadcastAPI(PROFILE_PATH)
-    ok, msg = api.login(email, password)
-    if ok:
-        _save_credentials(api)
-        return api
-    xbmcgui.Dialog().ok("iBroadcast", f"Login failed:\n{msg}")
-    return None
+    progress = xbmcgui.DialogProgress()
+    progress.create(
+        "iBroadcast — Sign in",
+        (
+            f"On any phone or computer, open:\n"
+            f"[B]{verify_uri}[/B]\n\n"
+            f"and enter this code:\n"
+            f"[B][COLOR cyan]{user_code}[/COLOR][/B]\n\n"
+            f"Waiting for authorization…"
+        ),
+    )
+    monitor = xbmc.Monitor()
+
+    try:
+        while True:
+            # Sleep `interval` seconds in 1-second chunks so the user can cancel.
+            for _ in range(interval):
+                if progress.iscanceled() or monitor.abortRequested():
+                    return None
+                if monitor.waitForAbort(1):
+                    return None
+
+            elapsed = time.time() - started
+            if elapsed > expires_in:
+                xbmcgui.Dialog().ok(
+                    "iBroadcast",
+                    "The sign-in code expired. Please try again."
+                )
+                return None
+            progress.update(min(int(elapsed / expires_in * 100), 99))
+
+            try:
+                code, payload = ibroadcast_oauth.exchange_device_code(dc["device_code"])
+            except ibroadcast_oauth.OAuthError as e:
+                xbmcgui.Dialog().ok("iBroadcast", f"Network error:\n{e}")
+                return None
+
+            if code == ibroadcast_oauth.EXCHANGE_OK:
+                api = IBroadcastAPI(
+                    PROFILE_PATH,
+                    access_token=payload["access_token"],
+                    refresh_token=payload.get("refresh_token"),
+                    expires_at=payload["expires_at"],
+                    on_token_refreshed=_save_credentials,
+                )
+                _save_credentials(api)
+                return api
+            if code == ibroadcast_oauth.EXCHANGE_PENDING:
+                continue
+            if code == ibroadcast_oauth.EXCHANGE_SLOW_DOWN:
+                interval += 5
+                continue
+            # Terminal error
+            xbmcgui.Dialog().ok("iBroadcast", f"Sign-in failed:\n{payload}")
+            return None
+    finally:
+        try:
+            progress.close()
+        except Exception:
+            pass
 
 
 def get_api(require_library=False):
-    """Return an authenticated API instance, prompting for login if needed."""
-    api = _get_saved_api()
+    """Return an authenticated API instance, prompting for OAuth sign-in if needed."""
+    if _has_legacy_credentials():
+        xbmcgui.Dialog().ok(
+            "iBroadcast — Re-authorization needed",
+            "iBroadcast switched to OAuth 2.0 sign-in. Your saved login is "
+            "no longer valid — please re-authorize on the next screen."
+        )
+        ADDON.setSetting("token", "")
 
+    api = _get_saved_api()
     if not api:
-        api = _keyboard_login()
+        api = _device_code_login()
         if not api:
             return None
 
     if require_library:
-        if not api.load_library():
+        try:
+            ok = api.load_library()
+        except IBroadcastAuthError:
+            _clear_credentials()
+            xbmcgui.Dialog().ok(
+                "iBroadcast",
+                "Your session has expired. Please sign in again."
+            )
+            api = _device_code_login()
+            if not api:
+                return None
+            try:
+                ok = api.load_library()
+            except IBroadcastAuthError:
+                ok = False
+        if not ok:
             xbmcgui.Dialog().ok("iBroadcast", "Failed to load library. Check your connection.")
             return None
 
@@ -564,17 +670,17 @@ def play_track(track_id):
 
 
 def account_action():
-    """Single Account button: login if logged out, offer logout if logged in."""
-    if ADDON.getSetting("token") and ADDON.getSetting("user_id"):
-        if xbmcgui.Dialog().yesno("iBroadcast", "You are logged in. Log out?"):
+    """Single Account button: sign in if signed out, offer sign-out if signed in."""
+    if ADDON.getSetting("access_token") or ADDON.getSetting("token"):
+        if xbmcgui.Dialog().yesno("iBroadcast", "You are signed in. Sign out?"):
             _clear_credentials()
             xbmcgui.Dialog().notification(
-                "iBroadcast", "Logged out", xbmcgui.NOTIFICATION_INFO
+                "iBroadcast", "Signed out", xbmcgui.NOTIFICATION_INFO
             )
     else:
-        api = _keyboard_login()
+        api = _device_code_login()
         if api:
-            xbmcgui.Dialog().ok("iBroadcast", "Login successful!")
+            xbmcgui.Dialog().ok("iBroadcast", "Sign-in successful!")
 
 
 def refresh_library():

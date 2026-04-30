@@ -1,10 +1,14 @@
 """
 iBroadcast API client for Kodi.
 
-Based on ibroadcastaio (https://github.com/robsonke/ibroadcastaio):
-  Login:   POST https://api.ibroadcast.com/s/JSON/status
+Authenticated with OAuth 2.0 bearer tokens. The OAuth token lifecycle
+(device-code grant, refresh, revoke) lives in ibroadcast_oauth.py; this
+module just consumes the access_token.
+
+Endpoints:
+  Status:  POST https://api.ibroadcast.com/s/JSON/status
   Library: POST https://library.ibroadcast.com
-  Streaming server and artwork server URLs come from the library response settings.
+  Streaming server and artwork server URLs come from library settings.
 """
 
 import json
@@ -14,6 +18,8 @@ import time
 import urllib.request
 import urllib.parse
 import urllib.error
+
+import ibroadcast_oauth
 
 try:
     import xbmc
@@ -28,16 +34,30 @@ class IBroadcastError(Exception):
     pass
 
 
+class IBroadcastAuthError(IBroadcastError):
+    """Raised when bearer auth fails and refresh cannot recover.
+    Callers should clear stored credentials and re-run the device-code flow."""
+
+
 class IBroadcastAPI:
-    API_URL     = "https://api.ibroadcast.com/s/JSON/status"
+    STATUS_URL  = "https://api.ibroadcast.com/s/JSON/status"
     LIBRARY_URL = "https://library.ibroadcast.com"
     CLIENT      = "kodi-plugin"
+    VERSION     = "1.4.0"
 
-    def __init__(self, profile_path, token=None, user_id=None):
-        self.profile_path       = profile_path  # used for library cache only
-        self.token              = token or None
-        self.user_id            = user_id or None
-        self._library           = None   # dict: track_id/album_id/... → named dict
+    def __init__(self, profile_path,
+                 access_token=None, refresh_token=None,
+                 expires_at=None, user_id=None,
+                 on_token_refreshed=None):
+        self.profile_path       = profile_path
+        self.access_token       = access_token or None
+        self.refresh_token      = refresh_token or None
+        self.expires_at         = int(expires_at) if str(expires_at or "").isdigit() else 0
+        self.user_id            = int(user_id) if str(user_id or "").isdigit() else None
+        # Called whenever access_token / refresh_token / expires_at / user_id
+        # change so the addon can persist them. Invoked with `self`.
+        self.on_token_refreshed = on_token_refreshed
+        self._library           = None
         self._settings          = {}
         self._streaming_server  = None
         self._artwork_server    = None
@@ -47,13 +67,28 @@ class IBroadcastAPI:
     # ------------------------------------------------------------------
 
     def _post(self, url, data):
+        self._ensure_fresh_token()
+        resp_data = self._post_once(url, data)
+        if isinstance(resp_data, dict) and resp_data.get("authenticated") is False:
+            if not self._refresh_now():
+                raise IBroadcastAuthError("Token refresh failed; re-authorization required")
+            resp_data = self._post_once(url, data)
+            if isinstance(resp_data, dict) and resp_data.get("authenticated") is False:
+                raise IBroadcastAuthError("Authorization rejected after refresh")
+        return resp_data
+
+    def _post_once(self, url, data):
+        if not self.access_token:
+            raise IBroadcastAuthError("No access token; re-authorization required")
         payload = json.dumps(data).encode("utf-8")
         req = urllib.request.Request(
             url,
             data=payload,
             headers={
-                "Content-Type": "application/json",
-                "User-Agent": "Mozilla/5.0 (compatible; Kodi/iBroadcast-Plugin/1.0)",
+                "Content-Type":  "application/json",
+                "Accept":        "application/json",
+                "Authorization": f"Bearer {self.access_token}",
+                "User-Agent":    f"Kodi-iBroadcast/{self.VERSION}",
             },
         )
         try:
@@ -64,6 +99,9 @@ class IBroadcastAPI:
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8")
             _log(f"POST {url} HTTP {e.code} → {body[:500]}")
+            if e.code == 401:
+                # Surface as auth so _post() can refresh-and-retry.
+                return {"authenticated": False, "result": False}
             try:
                 return json.loads(body)
             except Exception:
@@ -73,34 +111,59 @@ class IBroadcastAPI:
             raise IBroadcastError(f"Network error: {e.reason}") from e
 
     # ------------------------------------------------------------------
-    # Authentication
+    # Authentication / token lifecycle
     # ------------------------------------------------------------------
 
     def is_authenticated(self):
-        return bool(self.token and self.user_id)
+        return bool(self.access_token)
 
-    def login(self, email, password):
-        """Authenticate with email/password. Returns (success, message)."""
+    def _ensure_fresh_token(self):
+        """Refresh proactively if the current token is near expiry."""
+        if self.expires_at and ibroadcast_oauth.is_expired(self.expires_at):
+            self._refresh_now()
+
+    def _refresh_now(self):
+        if not self.refresh_token:
+            return False
+        try:
+            tok = ibroadcast_oauth.refresh(self.refresh_token)
+        except ibroadcast_oauth.OAuthError as e:
+            _log(f"Token refresh failed: {e}")
+            return False
+        self.access_token  = tok["access_token"]
+        # iBroadcast may rotate the refresh token; keep the old one if not returned.
+        self.refresh_token = tok.get("refresh_token") or self.refresh_token
+        self.expires_at    = tok["expires_at"]
+        self._notify_token_changed()
+        return True
+
+    def _notify_token_changed(self):
+        if self.on_token_refreshed:
+            try:
+                self.on_token_refreshed(self)
+            except Exception as e:
+                _log(f"on_token_refreshed callback failed: {e}")
+
+    def _bootstrap_user_id(self):
+        """Fetch user_id via mode=status when we only have a bearer token."""
+        if self.user_id:
+            return True
         data = {
-            "mode": "status",
-            "email_address": email,
-            "password": password,
-            "version": "1.0.0",
-            "client": self.CLIENT,
+            "client":          self.CLIENT,
+            "version":         self.VERSION,
+            "mode":            "status",
             "supported_types": False,
         }
         try:
-            resp = self._post(self.API_URL, data)
-        except IBroadcastError as e:
-            return False, str(e)
-
-        if "user" not in resp:
-            msg = resp.get("message") or str(resp)
-            return False, msg
-
-        self.user_id = resp["user"]["id"]
-        self.token   = resp["user"]["token"]
-        return True, "Login successful"
+            resp = self._post(self.STATUS_URL, data)
+        except IBroadcastError:
+            return False
+        uid = (resp.get("user") or {}).get("id")
+        if not uid:
+            return False
+        self.user_id = int(uid) if str(uid).isdigit() else uid
+        self._notify_token_changed()
+        return True
 
     # ------------------------------------------------------------------
     # Library
@@ -127,16 +190,19 @@ class IBroadcastAPI:
             except Exception as e:
                 _log(f"Cache load failed: {e}")
 
+        if not self.user_id and not self._bootstrap_user_id():
+            return False
+
         data = {
-            "_token":         self.token,
-            "_userid":        self.user_id,
-            "client":         self.CLIENT,
-            "version":        "1.0.0",
-            "mode":           "library",
+            "client":          self.CLIENT,
+            "version":         self.VERSION,
+            "mode":            "library",
             "supported_types": False,
         }
         try:
             resp = self._post(self.LIBRARY_URL, data)
+        except IBroadcastAuthError:
+            raise
         except IBroadcastError:
             return False
 
@@ -363,6 +429,11 @@ class IBroadcastAPI:
             _log(f"get_stream_url({track_id}): track has no file field, track data={trk}")
             return None
 
+        # Refresh ahead of time so the URL is signed with a long-lived token.
+        # Stream URLs are bound to the access token via ?Signature=, so a token
+        # that expires mid-playback can break a paused/resumed stream.
+        self._ensure_fresh_token()
+
         # Replace the leading bitrate segment: /128/... → /320/...
         file_path = re.sub(r"^/\d+/", f"/{bitrate}/", file_path)
 
@@ -371,11 +442,11 @@ class IBroadcastAPI:
 
         params = urllib.parse.urlencode({
             "Expires":   expires,
-            "Signature": self.token,
+            "Signature": self.access_token,
             "file_id":   track_id,
             "user_id":   self.user_id,
             "platform":  self.CLIENT,
-            "version":   "1.0.0",
+            "version":   self.VERSION,
         })
         return f"{server}{file_path}?{params}"
 
